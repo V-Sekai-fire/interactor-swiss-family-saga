@@ -8,10 +8,15 @@ extends Control
 const Look = preload("res://look/look.gd")
 const NAMES := ["Safety Bay", "Tentholm", "Falconhurst", "Woodlands", "Prospect Hill", "Shark Island", "Rockburg", "Cape Minster"]
 # Where each place sits, as a share of the map's width and height.
-const SPOTS := [Vector2(0.10, 0.74), Vector2(0.30, 0.68), Vector2(0.48, 0.46), Vector2(0.64, 0.24), Vector2(0.84, 0.38), Vector2(0.26, 0.86), Vector2(0.60, 0.76), Vector2(0.90, 0.72)]
+const SPOTS := [Vector2(0.10, 0.74), Vector2(0.30, 0.66), Vector2(0.48, 0.42), Vector2(0.62, 0.20), Vector2(0.84, 0.34), Vector2(0.46, 0.86), Vector2(0.72, 0.70), Vector2(0.92, 0.62)]
 
 var world: Dictionary = {}
 var island_edges: Array = []
+var selected_place := -1
+
+func set_selected(place: int) -> void:
+	selected_place = place
+	queue_redraw()
 
 func set_world(new_world: Dictionary, all_edges: Array) -> void:
 	world = new_world
@@ -56,6 +61,8 @@ func _draw() -> void:
 				marks.append(task)
 		var seen := p < known
 		var used := not marks.is_empty()
+		if p == selected_place:
+			draw_circle(here, 22.0, Color(Look.c("lit"), 0.25))
 		draw_circle(here, 15.0, Look.c("card"))
 		draw_arc(here, 15.0, 0.0, TAU, 40, Look.c("ink") if used else (Look.c("line") if seen else Color(Look.c("line"), 0.5)), 2.0)
 		var label_colour := Look.c("ink") if used else (Look.c("mute") if seen else Color(Look.c("mute"), 0.5))

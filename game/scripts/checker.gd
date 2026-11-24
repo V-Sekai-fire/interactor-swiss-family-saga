@@ -168,8 +168,11 @@ static func check(world: Dictionary, plan: Dictionary) -> Dictionary:
 	for pair in world["pairs"]:
 		var before: int = int(pair[0]) - 1
 		var after: int = int(pair[1]) - 1
-		if plan["done"][after] and (not plan["done"][before] or int(plan["start"][after]) < int(plan["start"][before]) + duration(world, plan, before)):
-			return _no("a task starts before the one it needs is finished", after)
+		if plan["done"][after]:
+			if not plan["done"][before]:
+				return _no("a task needs another task to be done first", after)
+			if int(plan["start"][after]) < int(plan["start"][before]) + duration(world, plan, before):
+				return _no("a task starts before the one it needs is finished", after)
 	# art crystals are not part of the story's worlds: a world with crystals is refused rather than guessed
 	if world["crystals"].size() > 0:
 		return _no("crystals are not supported by the checker", -1)

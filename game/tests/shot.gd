@@ -1,18 +1,20 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 # Renders the first screen once and saves it as a picture, so that the look can be read without a window in front of anyone.
-# Run: godot --path . --script game/tests/shot.gd -- OUT.png [CHAPTER]   (needs a renderer; the headless editor has none)
+# Run: godot --path . --script game/tests/shot.gd -- OUT.png [CHAPTER] [best|half]   (needs a renderer; the headless editor has none)
 extends SceneTree
 
 var frames := 0
 var out := ""
 var chapter := 0
+var mode := ""
 var scene: Control
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	out = args[0] if args.size() > 0 else "shot.png"
 	chapter = int(args[1]) - 1 if args.size() > 1 else 0
+	mode = args[2] if args.size() > 2 else ""
 	scene = load("res://game/scenes/main.tscn").instantiate()
 	root.add_child(scene)
 
@@ -22,7 +24,17 @@ func _process(_delta: float) -> bool:
 	frames += 1
 	if frames == 3:
 		scene.chapter = chapter # after the screen has built itself
-		scene._show()
+		scene._open_chapter()
+		if mode == "best":
+			scene._best()
+		elif mode == "half":
+			# two tasks put together by hand: the first two members of the model's plan for each
+			for t in [0, 1]:
+				scene.selected = t
+				for c in range(6):
+					if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
+						scene._member(c)
+			scene._select(1)
 	if frames == 14:
 		var image := root.get_texture().get_image()
 		print("saved ", out, " ", image.get_size(), " result=", image.save_png(out))
