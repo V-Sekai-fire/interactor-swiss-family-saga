@@ -35,6 +35,7 @@ var map: Control
 var timeline: Control
 var premise: Label
 var verdict: Label
+var lost: Label
 var dot: ColorRect
 var task_rows: Array = []        # per task: {"button": Button, "who": Label}
 var detail: Label
@@ -82,7 +83,7 @@ func _ready() -> void:
 	premise.custom_minimum_size = Vector2(500, 0)
 	island.add_child(premise)
 	map = IslandMap.new()
-	map.custom_minimum_size = Vector2(500, 215)
+	map.custom_minimum_size = Vector2(500, 190)
 	island.add_child(map)
 	var plan_box := Look.card(left, "The plan", "", 1)
 	timeline = Timeline.new()
@@ -90,6 +91,11 @@ func _ready() -> void:
 	timeline.state = state
 	timeline.names = FAMILY
 	plan_box.add_child(timeline)
+	lost = Label.new()
+	Look.muted(lost, 12)
+	Look.fixed(lost, 2, 500)
+	lost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plan_box.add_child(lost)
 
 	# right: the tasks, and the one being planned
 	var right := VBoxContainer.new()
@@ -295,9 +301,25 @@ func _refresh() -> void:
 		var best: int = state.best_score()
 		dot.color = Look.c("good")
 		verdict.text = "Allowed · done by time %d · score %d of %d%s" % [int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
+		lost.text = _where_it_went(state.regret())
 	else:
 		dot.color = Look.c("bad") if flagged >= 0 else Look.c("warn")
 		var where := ""
 		if flagged >= 0:
 			where = " (task %d)" % (flagged + 1)
 		verdict.text = "Not yet: %s%s" % [str(result["reason"]), where]
+		lost.text = "Once the plan is allowed, this shows exactly where it falls short of the best there is."
+
+# Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
+func _where_it_went(r: Dictionary) -> String:
+	if r.is_empty() or int(r["gap"]) == 0:
+		return "Nothing is left on the table: no plan scores more than this one, and the solver has proved it."
+	var parts: Array = []
+	if int(r["time_cost"]) > 0:
+		parts.append("%d later than the best (-%d)" % [int(r["end"]) - int(r["best_end"]), int(r["time_cost"])])
+	for entry in r["losses"]:
+		if parts.size() >= 3 or int(entry["loss"]) <= 0:
+			break
+		var name := str(state.world["tasks"][int(entry["task"])].get("name", "")).split(":")[0]
+		parts.append("%s “%s” (-%d)" % [entry["why"], name, int(entry["loss"])])
+	return "%d left on the table: %s." % [int(r["gap"]), "; ".join(parts)]

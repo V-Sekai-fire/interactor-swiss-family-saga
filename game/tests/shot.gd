@@ -35,6 +35,14 @@ func _process(_delta: float) -> bool:
 					if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
 						scene._member(c)
 			scene._select(1)
+		elif mode == "hand":
+			# every required task put on its model members, started as the screen suggests: allowed, and slower than the best
+			for t in range(scene.state.task_count()):
+				if bool(scene.state.world["tasks"][t]["required"]):
+					for c in range(6):
+						if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
+							scene.state.toggle_member(t, c)
+			scene._refresh()
 	if frames == 14:
 		var image := root.get_texture().get_image()
 		print("saved ", out, " ", image.get_size(), " result=", image.save_png(out))

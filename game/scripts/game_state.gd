@@ -136,3 +136,39 @@ func done_count() -> int:
 		if is_done(t):
 			n += 1
 	return n
+
+# Where a plan lost to the model's best, exactly. The objective is time_weight * end - bonuses - point_weight * points, so the gap to the best is the cost of the extra time
+# plus, task by task, what the best plan earns on that task and this one does not. The parts add up to the gap, so none of it is an estimate.
+func regret() -> Dictionary:
+	var mine: Dictionary = plan()
+	var result: Dictionary = verdict()
+	if not result["allowed"]:
+		return {}
+	var best_end := 0
+	for t in range(task_count()):
+		if best_plan["done"][t]:
+			best_end = max(best_end, int(best_plan["start"][t]) + CheckerScript.duration(world, best_plan, t))
+	var time_cost: int = int(world["time_weight"]) * (int(result["end"]) - best_end)
+	var losses: Array = []
+	for t in range(task_count()):
+		var gain_best := _value(best_plan, t)
+		var gain_mine := _value(mine, t)
+		if gain_best != gain_mine:
+			var why := "left out"
+			if bool(mine["done"][t]) and bool(best_plan["done"][t]):
+				why = "not performed" if mine["how"][t] != best_plan["how"][t] else "different"
+			elif bool(mine["done"][t]):
+				why = "extra"
+			losses.append({"task": t, "loss": gain_best - gain_mine, "why": why})
+	losses.sort_custom(func(a, b): return int(a["loss"]) > int(b["loss"]))
+	return {"gap": best_score() - int(result["score"]), "time_cost": time_cost, "end": int(result["end"]), "best_end": best_end, "losses": losses}
+
+# What a task is worth in a plan: its points and, for a duty or a performed scout, its bonus.
+func _value(p: Dictionary, t: int) -> int:
+	if not bool(p["done"][t]):
+		return 0
+	var task: Dictionary = world["tasks"][t]
+	var v: int = int(world["point_weight"]) * int(task["points"])
+	if task["kind"] == "duty" or p["how"][t] == "PERFORMANCE":
+		v += int(task["bonus"])
+	return v

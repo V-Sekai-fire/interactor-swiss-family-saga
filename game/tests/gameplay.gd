@@ -51,6 +51,12 @@ func _init() -> void:
 		v = s.verdict()
 		# an honest hand-built plan of the required tasks is either allowed or names a rule; if allowed it may not beat the best
 		_check(chapter + ": a hand-built plan never beats the model", not v["allowed"] or v["score"] <= s.best_score())
+		if v["allowed"]:
+			var r: Dictionary = s.regret()
+			var total: int = int(r["time_cost"])
+			for entry in r["losses"]:
+				total += int(entry["loss"])
+			_check(chapter + ": the regret adds up to the gap to the best (%d vs %d)" % [total, int(r["gap"])], total == int(r["gap"]))
 		print("%s: hand-built plan %s%s" % [chapter, "allowed, score %d of %d" % [v["score"], s.best_score()] if v["allowed"] else "refused: ", "" if v["allowed"] else v["reason"]])
 	print("RESULT: %d failures" % failures)
 	quit(0 if failures == 0 else 1)
