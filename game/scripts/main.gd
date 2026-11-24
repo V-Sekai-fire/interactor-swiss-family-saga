@@ -36,6 +36,7 @@ var timeline: Control
 var premise: Label
 var verdict: Label
 var lost: Label
+var note := ""
 var dot: ColorRect
 var task_rows: Array = []        # per task: {"button": Button, "who": Label}
 var detail: Label
@@ -161,6 +162,10 @@ func _ready() -> void:
 	later.text = "+"
 	later.pressed.connect(_nudge.bind(1))
 	timing.add_child(later)
+	var soonest := Button.new()
+	soonest.text = "Earliest"
+	soonest.pressed.connect(_soonest)
+	timing.add_child(soonest)
 	earliest_label = Label.new()
 	Look.muted(earliest_label, 12)
 	earliest_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -184,7 +189,7 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Clear", _clear], ["Show the best plan", _best], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Hint", _hint], ["Tidy up", _tidy], ["Clear", _clear], ["Best plan", _best], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -238,10 +243,35 @@ func _select(t: int) -> void:
 	_refresh()
 
 func _member(c: int) -> void:
+	note = ""
 	state.toggle_member(selected, c)
 	_refresh()
 
+func _soonest() -> void:
+	note = ""
+	state.start_earliest(selected)
+	_refresh()
+
+func _hint() -> void:
+	var h: Dictionary = state.hint()
+	if h.is_empty():
+		note = "That is already the best plan there is."
+	else:
+		selected = int(h["task"])
+		var who: Array = []
+		for c in range(FAMILY.size()):
+			if (int(h["party"]) >> c) & 1 == 1:
+				who.append(FAMILY[c])
+		note = "Hint: %s %s “%s”, from time %d%s." % [" and ".join(who), "do" if who.size() > 1 else "does", str(state.world["tasks"][selected].get("name", "")).split(":")[0], int(h["start"]), ", performing it" if bool(h["performance"]) else ""]
+	_refresh()
+
+func _tidy() -> void:
+	state.tidy()
+	note = "Tidied: every task now starts as early as it can, with the same people."
+	_refresh()
+
 func _nudge(step: int) -> void:
+	note = ""
 	state.set_start(selected, int(state.picks[selected]["start"]) + step)
 	_refresh()
 
@@ -250,10 +280,12 @@ func _perform() -> void:
 	_refresh()
 
 func _clear() -> void:
+	note = ""
 	state.clear_all()
 	_refresh()
 
 func _best() -> void:
+	note = "This is the best plan: no other plan scores more, and the solver has proved it."
 	state.load_best()
 	_refresh()
 
@@ -270,7 +302,8 @@ func _needs(task: Dictionary) -> String:
 func _refresh() -> void:
 	var result: Dictionary = state.verdict()
 	var flagged := -1
-	if not result["allowed"] and int(result.get("task", -1)) >= 0:
+	# a task is flagged when a rule is broken, not when a must-do task simply has not been placed yet
+	if not result["allowed"] and int(result.get("task", -1)) >= 0 and str(result["reason"]) != "a required task is not done":
 		flagged = int(result["task"])
 	for t in range(state.task_count()):
 		var task: Dictionary = state.world["tasks"][t]
@@ -289,7 +322,7 @@ func _refresh() -> void:
 		member_buttons[c].disabled = int(task["reach"]) > int(state.world["chars"][c]["reach"])
 	var assigned: bool = state.is_done(selected)
 	start_label.text = str(int(state.picks[selected]["start"])) if assigned else "-"
-	earliest_label.text = ""
+	earliest_label.text = "soonest: %d" % state.earliest_start(selected) if assigned else ""
 	perform_button.visible = task["kind"] == "scout"
 	perform_button.disabled = not assigned
 	perform_button.set_pressed_no_signal(bool(state.picks[selected]["performance"]))
@@ -300,15 +333,13 @@ func _refresh() -> void:
 	if result["allowed"]:
 		var best: int = state.best_score()
 		dot.color = Look.c("good")
-		verdict.text = "Allowed · done by time %d · score %d of %d%s" % [int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
-		lost.text = _where_it_went(state.regret())
+		var stars: int = state.stars()
+		verdict.text = "%s  Works · done by time %d · score %d of %d%s" % ["★".repeat(stars) + "☆".repeat(3 - stars), int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
+		lost.text = note if note != "" else _where_it_went(state.regret())
 	else:
 		dot.color = Look.c("bad") if flagged >= 0 else Look.c("warn")
-		var where := ""
-		if flagged >= 0:
-			where = " (task %d)" % (flagged + 1)
-		verdict.text = "Not yet: %s%s" % [str(result["reason"]), where]
-		lost.text = "Once the plan is allowed, this shows exactly where it falls short of the best there is."
+		verdict.text = "Not yet: %s" % _friendly(result)
+		lost.text = note if note != "" else "Once the plan works, this shows where it falls short of the best there is. Stuck? Try Hint."
 
 # Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
 func _where_it_went(r: Dictionary) -> String:
@@ -323,3 +354,34 @@ func _where_it_went(r: Dictionary) -> String:
 		var name := str(state.world["tasks"][int(entry["task"])].get("name", "")).split(":")[0]
 		parts.append("%s “%s” (-%d)" % [entry["why"], name, int(entry["loss"])])
 	return "%d left on the table: %s." % [int(r["gap"]), "; ".join(parts)]
+
+# A refusal in plain words, with what to try.
+func _friendly(result: Dictionary) -> String:
+	var t := int(result.get("task", -1))
+	var name := ""
+	if t >= 0:
+		name = "“%s”" % str(state.world["tasks"][t].get("name", "")).split(":")[0]
+	match str(result["reason"]):
+		"a required task is not done":
+			return "still to place: %d of %d must-do tasks." % [state.required_total() - state.required_placed(), state.required_total()]
+		"a character cannot reach the place in time":
+			return "someone cannot get to %s that soon. Try Earliest." % name
+		"a character is in two tasks at once":
+			return "someone is in two places at once around %s. Try Tidy up." % name
+		"too many arms work in one zone":
+			return "too many hands in one place at once. Move a task later, or Tidy up."
+		"the character's arm does not reach":
+			return "%s needs someone with a longer reach." % name
+		"a duty needs exactly its role mix":
+			return "%s needs: %s." % [name, _needs(state.world["tasks"][t])]
+		"a scout is done by exactly one character":
+			return "%s is a job for one person." % name
+		"this character cannot perform":
+			return "only Father and Ernest can perform %s." % name
+		"a task needs another task to be done first":
+			return "%s needs another task done first. Try Hint." % name
+		"a task starts before the one it needs is finished":
+			return "%s has to wait for the task it needs. Try Tidy up." % name
+		"the task is outside its time window":
+			return "%s is out of its time window." % name
+	return str(result["reason"])

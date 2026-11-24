@@ -35,6 +35,10 @@ func _process(_delta: float) -> bool:
 					if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
 						scene._member(c)
 			scene._select(1)
+		elif mode == "hint":
+			# a player who is stuck asks for three hints
+			for _i in range(3):
+				scene._hint()
 		elif mode == "hand":
 			# every required task put on its model members, started as the screen suggests: allowed, and slower than the best
 			for t in range(scene.state.task_count()):

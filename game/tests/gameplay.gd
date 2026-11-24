@@ -57,6 +57,31 @@ func _init() -> void:
 			for entry in r["losses"]:
 				total += int(entry["loss"])
 			_check(chapter + ": the regret adds up to the gap to the best (%d vs %d)" % [total, int(r["gap"])], total == int(r["gap"]))
+		# the hint, asked again and again, walks the player to the best plan
+		s.clear_all()
+		var hints := 0
+		while not s.hint().is_empty() and hints < 20:
+			hints += 1
+		v = s.verdict()
+		_check(chapter + ": hints lead to the best plan (%d hints)" % hints, v["allowed"] and v["score"] == s.best_score() and s.stars() == 3)
+		# tidying the best plan keeps it the best; tidying a slack plan never makes it worse
+		s.load_best()
+		s.tidy()
+		_check(chapter + ": tidying the best plan keeps its score", s.verdict()["allowed"] and s.verdict()["score"] == s.best_score())
+		# "Earliest" never lands later than a start the best plan already has, and moving a task there leaves the plan working
+		s.load_best()
+		var earliest_ok := true
+		for t in range(s.task_count()):
+			if not s.is_done(t):
+				continue
+			s.load_best()
+			var was: int = int(s.picks[t]["start"])
+			if s.earliest_start(t) > was:
+				earliest_ok = false
+			s.start_earliest(t)
+			if not s.verdict()["allowed"]:
+				earliest_ok = false
+		_check(chapter + ": Earliest is never later than the best plan and keeps it working", earliest_ok)
 		print("%s: hand-built plan %s%s" % [chapter, "allowed, score %d of %d" % [v["score"], s.best_score()] if v["allowed"] else "refused: ", "" if v["allowed"] else v["reason"]])
 	print("RESULT: %d failures" % failures)
 	quit(0 if failures == 0 else 1)
