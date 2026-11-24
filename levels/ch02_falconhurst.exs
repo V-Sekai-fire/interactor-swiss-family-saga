@@ -12,12 +12,12 @@ defmodule Ch02Falconhurst do
       chars: Family.chars(),
       zones: Enum.take(Island.zones(), 4),
       tasks: [
-        task(kind: :duty, at: 3, zone: 3, quick: 7, perf: 7, roles: {1, 0, 1, 0}, points: 6),            # 1 fell the timber at Falconhurst
-        task(kind: :duty, at: 3, zone: 3, quick: 10, perf: 10, roles: {1, 0, 1, 1}, points: 12),          # 2 raise the platform in the branches
-        task(kind: :duty, at: 2, zone: 2, quick: 8, perf: 8, roles: {1, 0, 0, 1}, points: 8),             # 3 build the bridge over the river
-        task(kind: :scout, at: 4, zone: 4, quick: 4, perf: 6, bonus: 6, points: 4),                       # 4 scout Woodlands for sago palms
-        task(kind: :scout, at: 1, zone: 1, quick: 3, perf: 4, required: false, bonus: 4, points: 3),      # 5 fetch the livestock from the bay
-        task(kind: :duty, at: 2, zone: 2, quick: 5, perf: 5, roles: {0, 1, 0, 0}, required: false, points: 5) # 6 the mother cooks the evening meal
+        task(kind: :duty, at: 3, zone: 3, quick: 7, perf: 7, roles: {1, 0, 1, 0}, points: 6, name: "fell the timber at Falconhurst"),   # fell the timber at Falconhurst
+        task(kind: :duty, at: 3, zone: 3, quick: 10, perf: 10, roles: {1, 0, 1, 1}, points: 12, name: "raise the platform in the branches"),   # raise the platform in the branches
+        task(kind: :duty, at: 2, zone: 2, quick: 8, perf: 8, roles: {1, 0, 0, 1}, points: 8, name: "build the bridge over the river"),   # build the bridge over the river
+        task(kind: :scout, at: 4, zone: 4, quick: 4, perf: 6, bonus: 6, points: 4, name: "scout Woodlands for sago palms"),   # scout Woodlands for sago palms
+        task(kind: :scout, at: 1, zone: 1, quick: 3, perf: 4, required: false, bonus: 4, points: 3, name: "fetch the livestock from the bay"),   # fetch the livestock from the bay
+        task(kind: :duty, at: 2, zone: 2, quick: 5, perf: 5, roles: {0, 1, 0, 0}, required: false, points: 5, name: "the mother cooks the evening meal")   # the mother cooks the evening meal
       ],
       pairs: [{1, 2}, {1, 3}],
       tw: 1, pw: 2

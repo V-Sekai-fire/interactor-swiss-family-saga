@@ -4,3 +4,8 @@ config_version=5
 
 [application]
 config/name="Swiss Family Saga"
+run/main_scene="res://game/scenes/main.tscn"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

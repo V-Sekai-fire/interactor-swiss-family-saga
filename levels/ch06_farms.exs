@@ -11,12 +11,12 @@ defmodule Ch06Farms do
       chars: Family.chars(),
       zones: Enum.take(Island.zones(), 4),
       tasks: [
-        task(kind: :duty, at: 4, zone: 4, quick: 9, perf: 9, roles: {0, 1, 0, 1}, points: 9),             # 1 plant the fields (the mother and a helper)
-        task(kind: :duty, at: 4, zone: 4, quick: 7, perf: 7, roles: {1, 0, 1, 0}, points: 7),             # 2 fence the livestock
-        task(kind: :duty, at: 1, zone: 1, quick: 13, perf: 13, roles: {1, 0, 1, 1}, points: 14),          # 3 rebuild the pinnace at Safety Bay
-        task(kind: :duty, at: 2, zone: 2, quick: 6, perf: 6, roles: {0, 0, 1, 1}, points: 6),             # 4 bring the pinnace's mast and sail to Tentholm
-        task(kind: :scout, at: 3, zone: 3, quick: 4, perf: 6, required: false, bonus: 6, points: 4),      # 5 scout the grove for cotton and rope
-        task(kind: :scout, at: 1, zone: 1, quick: 3, perf: 5, required: false, bonus: 4, points: 3)       # 6 test the pinnace in the bay
+        task(kind: :duty, at: 4, zone: 4, quick: 9, perf: 9, roles: {0, 1, 0, 1}, points: 9, name: "plant the fields (the mother and a helper)"),   # plant the fields (the mother and a helper)
+        task(kind: :duty, at: 4, zone: 4, quick: 7, perf: 7, roles: {1, 0, 1, 0}, points: 7, name: "fence the livestock"),   # fence the livestock
+        task(kind: :duty, at: 1, zone: 1, quick: 13, perf: 13, roles: {1, 0, 1, 1}, points: 14, name: "rebuild the pinnace at Safety Bay"),   # rebuild the pinnace at Safety Bay
+        task(kind: :duty, at: 2, zone: 2, quick: 6, perf: 6, roles: {0, 0, 1, 1}, points: 6, name: "bring the pinnace's mast and sail to Tentholm"),   # bring the pinnace's mast and sail to Tentholm
+        task(kind: :scout, at: 3, zone: 3, quick: 4, perf: 6, required: false, bonus: 6, points: 4, name: "scout the grove for cotton and rope"),   # scout the grove for cotton and rope
+        task(kind: :scout, at: 1, zone: 1, quick: 3, perf: 5, required: false, bonus: 4, points: 3, name: "test the pinnace in the bay")   # test the pinnace in the bay
       ],
       pairs: [{3, 4}, {1, 3}],
       tw: 1, pw: 2

@@ -11,12 +11,12 @@ defmodule Ch07Cape do
       chars: Family.chars(),
       zones: Enum.take(Island.zones(), 8),
       tasks: [
-        task(kind: :scout, at: 8, zone: 8, quick: 6, perf: 10, bonus: 12, points: 9),                     # 1 scout Cape Minster
-        task(kind: :duty, at: 8, zone: 8, quick: 9, perf: 9, roles: {1, 0, 1, 1}, points: 11),            # 2 raise the flag and the signal fire on the cape
-        task(kind: :scout, at: 6, zone: 6, quick: 5, perf: 7, bonus: 7, points: 6),                       # 3 map Shark Island's far shore
-        task(kind: :duty, at: 5, zone: 5, quick: 6, perf: 6, roles: {0, 0, 1, 1}, points: 7),             # 4 build the lookout cairn on Prospect Hill
-        task(kind: :duty, at: 1, zone: 1, quick: 5, perf: 5, roles: {0, 1, 0, 1}, required: false, points: 5), # 5 provision the pinnace
-        task(kind: :scout, at: 7, zone: 7, quick: 4, perf: 6, required: false, bonus: 5, points: 4)       # 6 check the cave stores at Rockburg
+        task(kind: :scout, at: 8, zone: 8, quick: 6, perf: 10, bonus: 12, points: 9, name: "scout Cape Minster"),   # scout Cape Minster
+        task(kind: :duty, at: 8, zone: 8, quick: 9, perf: 9, roles: {1, 0, 1, 1}, points: 11, name: "raise the flag and the signal fire on the cape"),   # raise the flag and the signal fire on the cape
+        task(kind: :scout, at: 6, zone: 6, quick: 5, perf: 7, bonus: 7, points: 6, name: "map Shark Island's far shore"),   # map Shark Island's far shore
+        task(kind: :duty, at: 5, zone: 5, quick: 6, perf: 6, roles: {0, 0, 1, 1}, points: 7, name: "build the lookout cairn on Prospect Hill"),   # build the lookout cairn on Prospect Hill
+        task(kind: :duty, at: 1, zone: 1, quick: 5, perf: 5, roles: {0, 1, 0, 1}, required: false, points: 5, name: "provision the pinnace"),   # provision the pinnace
+        task(kind: :scout, at: 7, zone: 7, quick: 4, perf: 6, required: false, bonus: 5, points: 4, name: "check the cave stores at Rockburg")   # check the cave stores at Rockburg
       ],
       pairs: [{5, 2}],
       tw: 1, pw: 2

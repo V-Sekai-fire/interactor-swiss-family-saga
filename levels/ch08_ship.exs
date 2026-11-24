@@ -12,11 +12,11 @@ defmodule Ch08Ship do
       chars: Family.chars(),
       zones: Enum.take(Island.zones(), 5),
       tasks: [
-        task(kind: :duty, at: 5, zone: 5, quick: 5, perf: 5, roles: {0, 0, 1, 1}, points: 8),             # 1 light the signal fire on Prospect Hill
-        task(kind: :scout, at: 3, zone: 3, quick: 3, perf: 5, bonus: 8, points: 5),                       # 2 fetch the journal from Falconhurst
-        task(kind: :duty, at: 1, zone: 1, quick: 8, perf: 8, roles: {1, 1, 1, 1}, points: 15),            # 3 receive the captain at Safety Bay: the whole party
-        task(kind: :duty, at: 2, zone: 2, quick: 6, perf: 6, roles: {0, 1, 0, 1}, required: false, points: 6), # 4 the mother lays a table at Tentholm
-        task(kind: :scout, at: 4, zone: 4, quick: 3, perf: 4, required: false, bonus: 4, points: 3)        # 5 a last walk through the fields
+        task(kind: :duty, at: 5, zone: 5, quick: 5, perf: 5, roles: {0, 0, 1, 1}, points: 8, name: "light the signal fire on Prospect Hill"),   # light the signal fire on Prospect Hill
+        task(kind: :scout, at: 3, zone: 3, quick: 3, perf: 5, bonus: 8, points: 5, name: "fetch the journal from Falconhurst"),   # fetch the journal from Falconhurst
+        task(kind: :duty, at: 1, zone: 1, quick: 8, perf: 8, roles: {1, 1, 1, 1}, points: 15, name: "receive the captain at Safety Bay: the whole party"),   # receive the captain at Safety Bay: the whole party
+        task(kind: :duty, at: 2, zone: 2, quick: 6, perf: 6, roles: {0, 1, 0, 1}, required: false, points: 6, name: "the mother lays a table at Tentholm"),   # the mother lays a table at Tentholm
+        task(kind: :scout, at: 4, zone: 4, quick: 3, perf: 4, required: false, bonus: 4, points: 3, name: "a last walk through the fields")   # a last walk through the fields
       ],
       pairs: [{1, 3}, {2, 3}],
       tw: 1, pw: 2

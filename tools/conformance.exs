@@ -97,7 +97,7 @@ terrain = fn {a, b, len, ter} -> [a, b, len, atom_free.(ter)] end
 world = %{nodes: w.nodes, edges: Enum.map(w.edges, terrain), zones: w.zones, pairs: Enum.map(w.pairs, &Tuple.to_list/1), time_weight: w.tw, point_weight: w.pw,
           climb_min_reach: w.climb, blink_range: w.blink, crystals: Enum.map(w.crystals, atom_free),
           chars: Enum.map(w.chars, fn c -> %{home: c.home, modes: c.modes, reach: c.reach, stride: c.stride, perform: c.perform, role: atom_free.(c.role), slots: c.slots, cooldown: c.cooldown} end),
-          tasks: Enum.map(w.tasks, fn t -> %{kind: atom_free.(t.kind), at: t.at, zone: t.zone, required: t.required, quick: t.quick, perf: t.perf, reach: t.reach, roles: Tuple.to_list(t.roles),
+          tasks: Enum.map(w.tasks, fn t -> %{name: Map.get(t, :name, ""), kind: atom_free.(t.kind), at: t.at, zone: t.zone, required: t.required, quick: t.quick, perf: t.perf, reach: t.reach, roles: Tuple.to_list(t.roles),
                                              arts: Enum.map(t.arts, atom_free), points: t.points, min_points: t.minp, bonus: t.bonus, release: t.release, deadline: t.deadline} end)}
 File.write!(Path.expand("../conformance/#{chapter}#{if variant == "", do: "", else: "_" <> variant}.json", __DIR__), JSON.encode!(%{chapter: chapter <> if(variant == "", do: "", else: " (" <> variant <> ")"), optimum: optimum.objective, world: world, cases: known}))
 IO.puts("#{chapter}: optimum #{optimum.objective}; #{length(known)} cases, #{Enum.count(known, & &1.feasible)} allowed, #{Enum.count(known, &(not &1.feasible))} refused, #{length(cases) - length(known)} unknown")
