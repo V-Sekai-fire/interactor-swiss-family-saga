@@ -19,3 +19,18 @@ defmodule Family do
   @names ["father", "mother", "Fritz", "Ernest", "Jack", "Francis"]
   def names, do: @names
 end
+
+defmodule Island do
+  # The places, in the order of the nodes: Safety Bay, Tentholm, Falconhurst, Woodlands, Prospect Hill, Shark Island, Rockburg, Cape Minster.
+  @places ["Safety Bay", "Tentholm", "Falconhurst", "Woodlands", "Prospect Hill", "Shark Island", "Rockburg", "Cape Minster"]
+  def places, do: @places
+  # Land paths, the river and the sea. Shark Island lies across water: swimming or the boat is the only way.
+  # The model's edges are one-way, so every path is listed both ways.
+  def edges do
+    one_way = [{1, 2, 3, :land}, {2, 3, 4, :land}, {1, 3, 6, :water}, {3, 4, 5, :land}, {4, 5, 6, :land},
+               {2, 6, 8, :water}, {3, 7, 4, :land}, {5, 8, 7, :land}]
+    one_way ++ Enum.map(one_way, fn {a, b, length, terrain} -> {b, a, length, terrain} end)
+  end
+  # One zone per place; the number is how many arms may work there at once (a character works with one arm or both).
+  def zones, do: [8, 8, 8, 8, 6, 6, 8, 6]
+end

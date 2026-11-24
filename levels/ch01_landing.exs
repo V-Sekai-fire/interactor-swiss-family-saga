@@ -7,9 +7,9 @@ defmodule Ch01Landing do
   def world do
     world(
       nodes: 3,
-      edges: [{1, 2, 3, :land}, {2, 3, 4, :land}, {1, 3, 6, :water}],
+      edges: Island.edges() |> Enum.filter(fn {a, b, _, _} -> a <= 3 and b <= 3 end),
       chars: Family.chars(),
-      zones: [8, 8, 6],
+      zones: Enum.take(Island.zones(), 3),
       tasks: [
         task(kind: :duty, at: 1, zone: 1, quick: 6, perf: 6, roles: {1, 0, 0, 1}, points: 5),            # 1 haul the stores from the wreck: the strong and a steady hand
         task(kind: :scout, at: 1, zone: 1, quick: 3, perf: 5, required: false, bonus: 6, points: 3),     # 2 round up the livestock and the dogs
