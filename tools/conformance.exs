@@ -10,6 +10,14 @@ Code.require_file(Path.expand("../levels/family.exs", __DIR__))
 [chapter | rest] = System.argv()
 Code.require_file(Path.expand("../levels/#{chapter}.exs", __DIR__))
 w = Module.concat([Macro.camelize(chapter)]).world()
+variant = System.get_env("VARIANT", "")
+w = if variant == "strict", do: %{w | tasks: Enum.map(w.tasks, &%{&1 | reach: 4})}, else: w
+# tight: every zone holds exactly its largest single task, so two tasks of one zone at once are over capacity
+tight_zone = fn z ->
+  usage = for t <- w.tasks, t.zone == z, do: (if t.kind == :duty, do: 2 * (t.roles |> Tuple.to_list() |> Enum.sum()), else: 2)
+  Enum.max([2 | usage])
+end
+w = if variant == "tight", do: %{w | zones: Enum.map(1..length(w.zones), tight_zone)}, else: w
 count = String.to_integer(Enum.at(rest, 0, "30"))
 :rand.seed(:exsss, {String.to_integer(Enum.at(rest, 1, "1")), 2, 3})
 nc = length(w.chars)
@@ -56,13 +64,25 @@ end
 pick = fn xs -> Enum.at(xs, :rand.uniform(length(xs)) - 1) end
 perturb = fn p ->
   t = :rand.uniform(nt) - 1
-  case :rand.uniform(6) do
+  case :rand.uniform(if variant == "", do: 6, else: 8) do
     1 -> %{p | start: List.replace_at(p.start, t, max(0, Enum.at(p.start, t) + pick.([-3, -1, 1, 2, 5])))}
     2 -> %{p | party: List.replace_at(p.party, t, Bitwise.bxor(Enum.at(p.party, t), Bitwise.bsl(1, :rand.uniform(nc) - 1)))}
     3 -> %{p | how: List.replace_at(p.how, t, pick.(["QUICK", "PERFORMANCE"]))}
     4 -> %{p | arm: List.replace_at(p.arm, t, pick.(["LEFT", "RIGHT", "BOTH"]))}
     5 -> %{p | done: List.replace_at(p.done, t, not Enum.at(p.done, t))}
     6 -> %{p | start: Enum.map(p.start, &(&1 + 1))}
+    # a member is replaced by another character of the same role: the role mix holds, so only reach, travel and time can refuse it
+    8 ->
+      roles = Enum.map(w.chars, & &1.role)
+      mask = Enum.at(p.party, t)
+      members = for c <- 0..(nc - 1), Bitwise.band(mask, Bitwise.bsl(1, c)) != 0, do: c
+      swaps = for c <- members, d <- 0..(nc - 1), d != c, Bitwise.band(mask, Bitwise.bsl(1, d)) == 0, Enum.at(roles, d) == Enum.at(roles, c), do: {c, d}
+      if swaps == [], do: p, else: (fn {c, d} -> %{p | party: List.replace_at(p.party, t, Bitwise.bxor(mask, Bitwise.bor(Bitwise.bsl(1, c), Bitwise.bsl(1, d))))} end).(pick.(swaps))
+    # two tasks of one zone start together: the zone's arms are counted
+    _ ->
+      zone_of = fn i -> Enum.at(w.tasks, i).zone end
+      others = for u <- 0..(nt - 1), u != t, zone_of.(u) == zone_of.(t), do: u
+      if others == [], do: p, else: %{p | start: List.replace_at(p.start, t, Enum.at(p.start, pick.(others)))}
   end
 end
 
@@ -79,5 +99,5 @@ world = %{nodes: w.nodes, edges: Enum.map(w.edges, terrain), zones: w.zones, pai
           chars: Enum.map(w.chars, fn c -> %{home: c.home, modes: c.modes, reach: c.reach, stride: c.stride, perform: c.perform, role: atom_free.(c.role), slots: c.slots, cooldown: c.cooldown} end),
           tasks: Enum.map(w.tasks, fn t -> %{kind: atom_free.(t.kind), at: t.at, zone: t.zone, required: t.required, quick: t.quick, perf: t.perf, reach: t.reach, roles: Tuple.to_list(t.roles),
                                              arts: Enum.map(t.arts, atom_free), points: t.points, min_points: t.minp, bonus: t.bonus, release: t.release, deadline: t.deadline} end)}
-File.write!(Path.expand("../conformance/#{chapter}.json", __DIR__), JSON.encode!(%{chapter: chapter, optimum: optimum.objective, world: world, cases: known}))
+File.write!(Path.expand("../conformance/#{chapter}#{if variant == "", do: "", else: "_" <> variant}.json", __DIR__), JSON.encode!(%{chapter: chapter <> if(variant == "", do: "", else: " (" <> variant <> ")"), optimum: optimum.objective, world: world, cases: known}))
 IO.puts("#{chapter}: optimum #{optimum.objective}; #{length(known)} cases, #{Enum.count(known, & &1.feasible)} allowed, #{Enum.count(known, &(not &1.feasible))} refused, #{length(cases) - length(known)} unknown")

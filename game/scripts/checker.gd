@@ -135,8 +135,8 @@ static func check(world: Dictionary, plan: Dictionary) -> Dictionary:
 				var duty_gap: int = int(chars[c]["cooldown"]) if tasks[t1]["kind"] == "duty" and tasks[t2]["kind"] == "duty" else 0
 				var a: int = int(tasks[t1]["at"]) - 1
 				var b: int = int(tasks[t2]["at"]) - 1
-				var first := int(plan["start"][t2]) >= int(plan["start"][t1]) + duration(world, plan, t1) + dist[c][a][b] + duty_gap
-				var second := int(plan["start"][t1]) >= int(plan["start"][t2]) + duration(world, plan, t2) + dist[c][b][a] + duty_gap
+				var first: bool = int(plan["start"][t2]) >= int(plan["start"][t1]) + duration(world, plan, t1) + dist[c][a][b] + duty_gap
+				var second: bool = int(plan["start"][t1]) >= int(plan["start"][t2]) + duration(world, plan, t2) + dist[c][b][a] + duty_gap
 				var shared: bool = tasks[t1]["kind"] == "scout" and tasks[t2]["kind"] == "scout" and a == b \
 					and plan["how"][t1] == "QUICK" and plan["how"][t2] == "QUICK" and plan["arm"][t1] != plan["arm"][t2]
 				if not (first or second or shared):
