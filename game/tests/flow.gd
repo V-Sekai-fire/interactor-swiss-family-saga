@@ -75,18 +75,13 @@ func _initialize() -> void:
 	_check(scene.next_button.disabled and not scene.previous_button.disabled, "Next is disabled on the last chapter even when it is done")
 	scene._go(1)
 	_check(scene.chapter == 7, "Next on the last chapter stays on it")
-	# Two levels of help, both off at the start: Hint (one-shot) makes this question's clue readable, Solve (a toggle) rings the better answer on every question until turned off
+	# The evidence is on the card from the first question and Solve (a toggle, off at the start) rings the better answer on every question until turned off
 	scene.chapter = 0
 	scene._open_chapter()
 	await process_frame
 	var none := func(): return not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed
-	_check(not scene.hint_button.button_pressed and not scene.solve_button.button_pressed, "both help levels are off at the start")
-	_check(scene.clue_label.visible and not _has_letters(scene.clue_label.text.substr(2)), "the clue is there but unreadable at the start")
-	_check(none.call(), "no answer is ringed at the start")
-	scene.hint_button.pressed.emit()
-	await process_frame
-	_check(_has_letters(scene.clue_label.text) and none.call(), "Hint: the clue is readable and no answer is ringed")
-	_check(not scene.hint_button.toggle_mode, "Hint is a one-shot button, not a toggle")
+	_check(scene.evidence_label.visible and scene.evidence_label.text.contains("THE FAMILY") and scene.evidence_label.text.contains("YOUR RECORD"), "the evidence is on the card at the start")
+	_check(not scene.solve_button.button_pressed and none.call(), "Solve is off and no answer is ringed at the start")
 	scene.solve_button.button_pressed = true
 	scene._solve()
 	await process_frame
@@ -94,10 +89,12 @@ func _initialize() -> void:
 	_check(scene.option_buttons[better].button_pressed and not scene.option_buttons[1 - better].button_pressed, "Solve: the better answer is ringed")
 	scene._choose(better)
 	await process_frame
-	_check(not _has_letters(scene.clue_label.text.substr(2)) and scene.option_buttons[scene._better_answer()].button_pressed, "the next question masks the clue again; Solve stays on")
+	_check(scene.option_buttons[scene._better_answer()].button_pressed, "Solve stays on for the next question")
+	_check(scene.record["who"][0] + scene.record["perform"][0] + scene.record["skip"][0] == 1, "a right answer counts once in the record")
+	_check(scene.evidence_label.text.contains("1/1"), "the record line shows it")
 	scene.solve_button.button_pressed = false
 	scene._solve()
 	await process_frame
-	_check(not _has_letters(scene.clue_label.text.substr(2)) and none.call(), "Solve off again: nothing is ringed and the clue is still unreadable")
+	_check(none.call(), "Solve off again: nothing is ringed")
 	print("RESULT: %d failures" % failures)
 	quit(1 if failures > 0 else 0)

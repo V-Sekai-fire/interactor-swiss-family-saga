@@ -43,7 +43,7 @@ var row_task: Array = []
 var choice_kicker: Label
 var choice_prompt: Label
 var rule: Label
-var clue_label: Label
+var evidence_label: Label
 var option_buttons: Array = []
 var edit_card: Control
 var choice_card: Control
@@ -57,11 +57,9 @@ var earliest_label: Label
 var perform_button: Button
 var island_edges: Array = []
 var hinted := -1
-var hints_on := false
 var solve_on := false
-var hint_button: Button
+var record := {"who": [0, 0], "perform": [0, 0], "skip": [0, 0]}
 var solve_button: Button
-var clue_text := ""
 
 func _ready() -> void:
 	Look.fit(get_window())
@@ -145,12 +143,11 @@ func _ready() -> void:
 	choice_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	choice_prompt.custom_minimum_size = Vector2(520, 0)
 	choice.add_child(choice_prompt)
-	clue_label = Label.new()
-	Look.muted(clue_label, 12)
-	clue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	clue_label.custom_minimum_size = Vector2(520, 0)
-	clue_label.add_theme_color_override("font_color", Look.c("lit"))
-	choice.add_child(clue_label)
+	evidence_label = Label.new()
+	Look.muted(evidence_label, 12)
+	evidence_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	evidence_label.custom_minimum_size = Vector2(520, 0)
+	choice.add_child(evidence_label)
 	for k in range(2):
 		var option := Button.new()
 		option.custom_minimum_size = Vector2(500, 52)
@@ -246,7 +243,7 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Hint", _hint], ["Solve", _solve], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Solve", _solve], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -255,8 +252,6 @@ func _ready() -> void:
 			next_button = button
 		if entry[0] == "Previous":
 			previous_button = button
-		if entry[0] == "Hint":
-			hint_button = button
 		if entry[0] == "Solve":
 			button.toggle_mode = true
 			_style_toggle(button)
@@ -367,27 +362,52 @@ func _soonest() -> void:
 	state.start_earliest(selected)
 	_refresh()
 
-# The clue is in place from the first question but unreadable (a dot for each letter, so the card keeps its size) until hints are on.
-func _show_clue() -> void:
-	clue_label.visible = not state.choices_done()
-	clue_label.text = "💡 " + (clue_text if hints_on else _masked(clue_text))
+# What the player has to go on, none of it an answer: who each family member is and when they are free, and what the chapter still asks.
+# The last line is the player's own record by kind of question, so the next question can be read against the edge of what they know.
+func _show_evidence() -> void:
+	var evidence: Dictionary = state.evidence()
+	evidence_label.visible = not evidence.is_empty()
+	if evidence.is_empty():
+		return
+	var lines: Array = ["THE FAMILY"]
+	for member in evidence["members"]:
+		var c: int = FAMILY.find(str(member["name"]))
+		lines.append("%s  %s%s · free at %d" % [str(member["name"]).rpad(7), _trait(c).split(": ")[1], "" , int(member["free_at"])])
+	lines.append("STILL TO DO AFTER THIS")
+	var shown := 0
+	for task in evidence["after"]:
+		if shown == 3:
+			lines.append("… and %d more" % (evidence["after"].size() - shown))
+			break
+		lines.append("%s · %s, takes %d" % [_short_name(str(task["name"])), _needs(state.world["tasks"][int(task["task"])]), int(task["quick"])])
+		shown += 1
+	if evidence["after"].is_empty():
+		lines.append("nothing: this is the last question")
+	lines.append(_record_line())
+	evidence_label.text = "\n".join(lines)
 
-func _masked(text: String) -> String:
-	var out := ""
-	for i in range(text.length()):
-		out += text[i] if text[i] == " " else "·"
-	return out
+func _short_name(text: String) -> String:
+	return text if text.length() <= 30 else text.substr(0, 29) + "…"
+
+# The player's record by kind of question: right answers of those given, with the weakest kind named as the edge.
+func _record_line() -> String:
+	var names := {"who": "who goes", "perform": "properly or quick", "skip": "worth doing"}
+	var parts: Array = []
+	var edge := ""
+	var worst := 2.0
+	for kind in ["who", "perform", "skip"]:
+		var r: Array = record[kind]
+		parts.append("%s %d/%d" % [names[kind], r[0], r[1]])
+		if r[1] > 0 and r[0] < r[1] and float(r[0]) / float(r[1]) < worst:
+			worst = float(r[0]) / float(r[1])
+			edge = names[kind]
+	return "YOUR RECORD  " + " · ".join(parts) + ("  (your edge: %s)" % edge if edge != "" else "")
 
 # The better of the two answers in front of the player: the one that loses nothing.
 func _better_answer() -> int:
 	return 0 if int(state.current_step()["options"][0]["loss"]) == 0 else 1
 
-# Two levels of help, both off at the start. Hint is a one-shot: it makes the clue of this question readable (it says what to weigh) and the next question masks it again; Solve marks the better answer, or on the free board names the next piece of the best plan.
-func _hint() -> void:
-	hints_on = true
-	_show_clue()
-	_refresh()
-
+# Solve marks the better answer, or on the free board names the next piece of the best plan; it is off at the start and stays on for every question until turned off.
 func _solve() -> void:
 	solve_on = solve_button.button_pressed
 	if not solve_on:
@@ -566,8 +586,8 @@ func _show_step() -> void:
 		choice_prompt.text = "%s  Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % [_stars_text(stars), stars]
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
-		clue_text = ""
-		clue_label.visible = false
+		evidence_label.text = ""
+		evidence_label.visible = false
 		_say(_where_it_went(state.regret()))
 		return
 	var t: int = int(step["task"])
@@ -586,9 +606,7 @@ func _show_step() -> void:
 	hinted = -1
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
-	clue_text = state.clue()
-	hints_on = false
-	_show_clue()
+	_show_evidence()
 	if solve_on:
 		hinted = _better_answer()
 	_ring_hint()
@@ -635,7 +653,7 @@ func _describe(step: Dictionary, k: int) -> String:
 		if ((int(option["party"]) >> c) & 1) == 1 and ((int(other["party"]) >> c) & 1) == 0:
 			differing = c
 	var line := "%s  ·  starts at %d, takes %d" % [" and ".join(who), int(option["start"]), int(option["takes"])]
-	return line + ("\n%s; %s" % [_trait(differing), state.need_phrase(differing).replace("has nothing else to do after this", "nothing else to do after this").replace("is needed again for", "needed again for")] if differing >= 0 else "")
+	return line + ("\n" + _trait(differing) if differing >= 0 else "")
 
 func _ring_hint() -> void:
 	for k in range(option_buttons.size()):
@@ -648,6 +666,11 @@ func _choose(k: int) -> void:
 		else:
 			_go(1)
 		return
+	var step_now: Dictionary = state.current_step()
+	var kind_now := str(step_now["kind"])
+	record[kind_now][1] += 1
+	if int(step_now["options"][k]["loss"]) == 0:
+		record[kind_now][0] += 1
 	var result: Dictionary = state.choose(k)
 	note = str(result["note"])
 	hinted = -1
