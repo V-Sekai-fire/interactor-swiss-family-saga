@@ -39,6 +39,7 @@ var lost: Label
 var choice_kicker: Label
 var choice_prompt: Label
 var rule: Label
+var clue_label: Label
 var option_buttons: Array = []
 var edit_card: Control
 var note := ""
@@ -136,9 +137,16 @@ func _ready() -> void:
 	choice_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	choice_prompt.custom_minimum_size = Vector2(520, 0)
 	choice.add_child(choice_prompt)
+	clue_label = Label.new()
+	Look.muted(clue_label, 12)
+	clue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	clue_label.custom_minimum_size = Vector2(520, 0)
+	clue_label.add_theme_color_override("font_color", Look.c("lit"))
+	choice.add_child(clue_label)
 	for k in range(2):
 		var option := Button.new()
-		option.custom_minimum_size = Vector2(0, 62)
+		option.custom_minimum_size = Vector2(500, 52)
+		option.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_toggle(option)
@@ -451,6 +459,7 @@ func _show_step() -> void:
 		choice_prompt.text = "%s  Every decision is made. Try again to see how the other choices play out, or go on." % ("★".repeat(stars) + "☆".repeat(3 - stars))
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
+		clue_label.text = ""
 		return
 	var t: int = int(step["task"])
 	var task: Dictionary = state.world["tasks"][t]
@@ -467,6 +476,7 @@ func _show_step() -> void:
 			choice_prompt.text = "Who should %s, at %s? It needs %s." % [what, place, _needs(task)]
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
+	clue_label.text = "Clue: " + state.clue()
 	selected = t
 
 # One word for how quickly a family member moves, and the role in the family's own terms.
@@ -505,8 +515,8 @@ func _describe(step: Dictionary, k: int) -> String:
 	for c in range(FAMILY.size()):
 		if ((int(option["party"]) >> c) & 1) == 1 and ((int(other["party"]) >> c) & 1) == 0:
 			differing = c
-	var line := "%s\nstarts at %d · takes %d" % [" and ".join(who), int(option["start"]), int(option["takes"])]
-	return line + ("\n" + _trait(differing) if differing >= 0 else "")
+	var line := "%s  ·  starts at %d, takes %d" % [" and ".join(who), int(option["start"]), int(option["takes"])]
+	return line + ("\n%s; %s" % [_trait(differing), state.need_phrase(differing).replace("has nothing else to do after this", "nothing else to do after this").replace("is needed again for", "needed again for")] if differing >= 0 else "")
 
 func _choose(k: int) -> void:
 	if state.choices_done():

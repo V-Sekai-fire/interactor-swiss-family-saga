@@ -384,8 +384,8 @@ func _option_for(t: int, party: int, performance: bool, start: int, skip: bool) 
 	picks[t] = saved
 	return option
 
-# The score of the plan if this option is taken and every task after it is done the way the best plan does it; -999999 when that plan does not work.
-func _completion_score(t: int, option: Dictionary) -> int:
+# The plan if this option is taken and every task after it is done the way the best plan does it: its score (-999999 when it does not work) and when it ends.
+func _completion(t: int, option: Dictionary) -> Dictionary:
 	var trial = get_script().new()
 	trial.world = world
 	trial.best_plan = best_plan
@@ -398,7 +398,10 @@ func _completion_score(t: int, option: Dictionary) -> int:
 		var u: int = step_order[i]
 		trial._apply(u, trial._option_for(u, int(best_plan["party"][u]), best_plan["how"][u] == "PERFORMANCE", -1, false))
 	var v: Dictionary = trial.verdict()
-	return int(v["score"]) if v["allowed"] else -999999
+	return {"score": int(v["score"]) if v["allowed"] else -999999, "end": int(v.get("end", 0))}
+
+func _completion_score(t: int, option: Dictionary) -> int:
+	return int(_completion(t, option)["score"])
 
 # The alternative that costs the least among those that cost enough to matter: a close call, but one that changes the score.
 func _best_alternative(t: int, good_score: int) -> Dictionary:
@@ -450,3 +453,71 @@ func _best_alternative(t: int, good_score: int) -> Dictionary:
 
 func _name(c: int) -> String:
 	return ["Father", "Mother", "Fritz", "Ernest", "Jack", "Francis"][c]
+
+# ---- the clue, on the same card as the question ----------------------------------------------------------------------------------------------------------------
+
+# The next task after this step that the best plan gives to a family member: {"task", "start"} or {} when they have nothing more to do.
+func next_need(c: int) -> Dictionary:
+	for i in range(step_index + 1, step_order.size()):
+		var u: int = step_order[i]
+		if (int(best_plan["party"][u]) >> c) & 1 == 1:
+			return {"task": u, "start": int(best_plan["start"][u])}
+	return {}
+
+func _task_name(t: int) -> String:
+	return str(world["tasks"][t].get("name", "")).split(":")[0]
+
+# What a member is needed for afterwards, in words.
+func need_phrase(c: int) -> String:
+	var need := next_need(c)
+	return "has nothing else to do after this" if need.is_empty() else "is needed again for “%s”" % _short(_task_name(int(need["task"])), 30)
+
+# A clue in plain words for the question now on screen, built from the same model as the answers, so it points the right way.
+func clue() -> String:
+	if choices_done():
+		return ""
+	var t: int = step_order[step_index]
+	var task: Dictionary = world["tasks"][t]
+	var good: Dictionary = {}
+	var alt: Dictionary = {}
+	for o in current_options:
+		if int(o["loss"]) == 0:
+			good = o
+		else:
+			alt = o
+	var kind := str(alt.get("kind", "who"))
+	var good_end := int(_completion(t, good)["end"])
+	var alt_end := int(_completion(t, alt)["end"])
+	if kind == "who":
+		var sent: int = int(alt["swapped_in"]) # goes in the other answer, stays free in the better one
+		var kept: int = int(alt["swapped_out"])
+		var sent_need := next_need(sent)
+		var kept_need := next_need(kept)
+		# keep free whoever is needed again sooner: the clue says what each is needed for, and that rule
+		# the rule is only used when it truly points to the better answer: the one who stays free is needed again, strictly sooner, for a different task
+		var points_right: bool = sent_need.is_empty() == false and (kept_need.is_empty() or (int(sent_need["start"]) < int(kept_need["start"]) and int(sent_need["task"]) != int(kept_need["task"])))
+		if points_right:
+			return "%s %s; %s %s. Whoever is needed again soonest should stay free." % [_name(sent), need_phrase(sent), _name(kept), need_phrase(kept)]
+		return "Sending %s ends the chapter at time %d; sending %s ends it at %d." % [_name(kept), good_end, _name(sent), alt_end]
+	if kind == "perform":
+		if alt_end == good_end:
+			return "Either way the chapter ends at time %d, so doing it properly costs no time at all." % good_end
+		return "Doing it properly makes the chapter end at %d instead of %d, but it adds %d to the score." % [good_end, alt_end, _worth_of(task, true) - _worth_of(task, false)]
+	# skip
+	if alt_end == good_end:
+		return "The chapter ends at time %d whether you do it or not, so it only adds to the score." % good_end
+	return "Doing it ends the chapter at %d rather than %d, and adds %d to the score." % [good_end, alt_end, _worth_of(task, bool(best_plan["how"][t] == "PERFORMANCE"))]
+
+func _worth_of(task: Dictionary, performed: bool) -> int:
+	var v: int = int(world["point_weight"]) * int(task["points"])
+	if task["kind"] == "duty" or performed:
+		v += int(task["bonus"])
+	return v
+
+# A name cut to fit a line, at a word boundary.
+func _short(text: String, length: int) -> String:
+	if text.length() <= length:
+		return text
+	var cut := text.substr(0, length - 1)
+	var space := cut.rfind(" ")
+	return (cut.substr(0, space) if space > length / 2 else cut) + "…"
