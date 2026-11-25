@@ -44,5 +44,15 @@ func _initialize() -> void:
 	await process_frame
 	scene._go(1)
 	_check(scene.chapter == 0, "still on chapter 1 after a refused Next")
+	# Restart from the middle of a run and from the editor returns to the first decision with Next locked
+	scene._choose(0)
+	scene._choose(0)
+	scene._toggle_edit()
+	scene._restart()
+	await process_frame
+	_check(not scene.edit_card.visible and scene.choice_card.visible, "Restart closes the editor and shows the decisions")
+	_check(scene.state.current_step()["index"] == 0, "Restart goes back to the first decision")
+	_check(scene.next_button.disabled, "Restart locks Next again")
+	_check(scene.console_lines.size() == 1, "Restart clears the console")
 	print("RESULT: %d failures" % failures)
 	quit(1 if failures > 0 else 0)
