@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+# The game on GitHub Pages: the tests run on the official Godot engine, the game is exported for the web with the official single-thread template (so the page needs no special headers),
+# and a push to main publishes it at https://v-sekai-fire.github.io/interactor-swiss-family-saga/. A pull request builds and tests but does not publish.
+name: pages
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  GODOT_RELEASE: 4.6-stable
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Cache the engine and the web template
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_RELEASE }}-web-nothreads-v1
+      - name: Fetch the engine and the web template
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot/templates && cd ~/godot
+          base=https://github.com/godotengine/godot/releases/download/$GODOT_RELEASE
+          curl -fsSL -o godot.zip $base/Godot_v${GODOT_RELEASE}_linux.x86_64.zip
+          unzip -q godot.zip && rm godot.zip
+          curl -fsSL -o templates.tpz $base/Godot_v${GODOT_RELEASE}_export_templates.tpz
+          unzip -q -j templates.tpz templates/web_nothreads_release.zip templates/version.txt -d templates
+          rm templates.tpz
+          curl -fsSL -o LICENSE.txt https://raw.githubusercontent.com/godotengine/godot/$GODOT_RELEASE/LICENSE.txt
+          curl -fsSL -o COPYRIGHT.txt https://raw.githubusercontent.com/godotengine/godot/$GODOT_RELEASE/COPYRIGHT.txt
+      - name: Install the web template
+        run: |
+          version=$(cat ~/godot/templates/version.txt)
+          mkdir -p ~/.local/share/godot/export_templates/$version
+          cp ~/godot/templates/web_nothreads_release.zip ~/.local/share/godot/export_templates/$version/
+      - name: Import the project
+        run: ~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64 --headless --path . --import
+      - name: Tests (each script exits non-zero on a failure)
+        run: |
+          for t in conformance gameplay choices clues; do
+            echo "== $t"
+            ~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64 --headless --path . --script game/tests/$t.gd | grep -E "^(RESULT|FAIL|DISAGREE)"
+            test ${PIPESTATUS[0]} -eq 0
+          done
+      - name: Export for the web
+        run: |
+          mkdir -p build/web
+          ~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64 --headless --path . --export-release Web build/web/index.html
+          cp ~/godot/LICENSE.txt build/web/LICENSE-godot.txt
+          cp ~/godot/COPYRIGHT.txt build/web/COPYRIGHT-godot.txt
+          cp LICENSES/OFL-1.1.txt build/web/LICENSE-fonts-OFL-1.1.txt
+          ls -la build/web
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
