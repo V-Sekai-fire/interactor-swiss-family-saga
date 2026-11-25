@@ -9,6 +9,7 @@ const CheckerScript := preload("res://game/scripts/checker.gd")
 const IslandMap := preload("res://game/scripts/island_map.gd")
 const State := preload("res://game/scripts/game_state.gd")
 const Timeline := preload("res://game/scripts/timeline.gd")
+const Mark := preload("res://game/scripts/mark.gd")
 const CHAPTERS := [
 	["ch01_landing", "The landing"], ["ch02_falconhurst", "Falconhurst"], ["ch03_boat", "The tub boat"], ["ch04_rockburg", "Rockburg"],
 	["ch05_stairs", "Stairs and the bridge"], ["ch06_farms", "Farms and the pinnace"], ["ch07_cape", "Cape Minster"], ["ch08_ship", "The ship"],
@@ -44,17 +45,21 @@ var option_buttons: Array = []
 var edit_card: Control
 var note := ""
 var dot: ColorRect
-var task_rows: Array = []        # per task: {"button": Button, "who": Label}
+var task_rows: Array = []        # per task: {"row", "mark", "button", "who"}
+var star_marks: Array = []
 var detail: Label
 var member_buttons: Array = []
 var start_label: Label
 var earliest_label: Label
 var perform_button: Button
 var island_edges: Array = []
+var emoji_font: FontFile
 
 func _ready() -> void:
 	Look.fit(get_window())
-	get_window().theme = Look.make()
+	var theme: Theme = Look.make()
+	_add_emoji_fallback(theme)
+	get_window().theme = theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	Look.sky(self)
 	var margin := MarginContainer.new()
@@ -114,6 +119,8 @@ func _ready() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		tasks_box.add_child(row)
+		var mark := Mark.new("duty")
+		row.add_child(mark)
 		var pick := Button.new()
 		pick.toggle_mode = true
 		_style_row(pick)
@@ -127,7 +134,7 @@ func _ready() -> void:
 		Look.fixed(who, 1, 190)
 		who.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(who)
-		task_rows.append({"row": row, "button": pick, "who": who})
+		task_rows.append({"row": row, "mark": mark, "button": pick, "who": who})
 
 	var choice := Look.card(right, "Your choice", "", 1)
 	choice_kicker = Look.kicker("")
@@ -232,6 +239,10 @@ func _ready() -> void:
 	dot.custom_minimum_size = Vector2(12, 12)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(dot)
+	for _i in range(3):
+		var star := Mark.new("star_empty")
+		bar.add_child(star)
+		star_marks.append(star)
 	verdict = Label.new()
 	Look.muted(verdict, 13)
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -243,6 +254,7 @@ func _ready() -> void:
 		button.pressed.connect(entry[1])
 		bar.add_child(button)
 	_open_chapter()
+	_give_fallback_to_all(self)
 
 # A toggle that shows its state: outlined when off, inked when on (the design system's colours).
 func _style_toggle(b: Button) -> void:
@@ -266,6 +278,33 @@ func _style_row(b: Button) -> void:
 	b.add_theme_stylebox_override("hover_pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 2))
 	for colour_name in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(colour_name, Look.c("ink"))
+
+# Emoji and symbols the design system's fonts do not have come from Noto Color Emoji (OFL), added behind every font that is in use. A browser has no system font to fall back on.
+# The design system hands labels their own font objects, so the fallback is added to the theme's fonts and then to the fonts of every control once the screen is built.
+func _add_emoji_fallback(theme: Theme) -> void:
+	emoji_font = FontFile.new()
+	if emoji_font.load_dynamic_font("res://fonts/NotoColorEmoji.ttf") != OK:
+		emoji_font = null
+		return
+	if theme.default_font != null:
+		_give_fallback(theme.default_font)
+	for type in theme.get_font_type_list():
+		for font_name in theme.get_font_list(type):
+			_give_fallback(theme.get_font(font_name, type))
+
+func _give_fallback(font: Font) -> void:
+	if font != null and emoji_font != null and not font.fallbacks.has(emoji_font):
+		var fallbacks: Array[Font] = font.fallbacks.duplicate()
+		fallbacks.append(emoji_font)
+		font.fallbacks = fallbacks
+
+func _give_fallback_to_all(node: Node) -> void:
+	if node is Control:
+		for font_name in ["font", "normal_font", "bold_font"]:
+			if node.has_theme_font(font_name):
+				_give_fallback(node.get_theme_font(font_name))
+	for child in node.get_children():
+		_give_fallback_to_all(child)
 
 func _load(file: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string("res://conformance/%s.json" % file))
@@ -359,7 +398,8 @@ func _refresh() -> void:
 	for t in range(state.task_count()):
 		var task: Dictionary = state.world["tasks"][t]
 		var pick: Button = task_rows[t]["button"]
-		pick.text = "%s  %s" % ["■" if task["kind"] == "duty" else "○", str(task.get("name", "")).split(":")[0]]
+		pick.text = str(task.get("name", "")).split(":")[0]
+		task_rows[t]["mark"].set_shape("duty" if task["kind"] == "duty" else "scout")
 		pick.set_pressed_no_signal(t == selected)
 		var names: Array = []
 		for c in state.members(t):
@@ -385,11 +425,16 @@ func _refresh() -> void:
 		var best: int = state.best_score()
 		dot.color = Look.c("good")
 		var stars: int = state.stars()
-		verdict.text = "%s  Works · done by time %d · score %d of %d%s" % ["★".repeat(stars) + "☆".repeat(3 - stars), int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
+		verdict.text = "✅ Works · done by time %d · score %d of %d%s" % [int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
+		for i in range(3):
+			star_marks[i].visible = true
+			star_marks[i].set_shape("star" if i < stars else "star_empty")
 		lost.text = note if note != "" else _where_it_went(state.regret())
 	else:
 		dot.color = Look.c("bad") if flagged >= 0 else Look.c("warn")
-		verdict.text = "Not yet: %s" % _friendly(result)
+		verdict.text = "🧭 Not yet: %s" % _friendly(result)
+		for star in star_marks:
+			star.visible = false
 		lost.text = note if note != "" else "Once the plan works, this shows where it falls short of the best there is. Stuck? Try Hint."
 
 # Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
@@ -456,7 +501,7 @@ func _show_step() -> void:
 	if step.is_empty():
 		var stars: int = state.stars()
 		choice_kicker.text = "ALL CHOSEN"
-		choice_prompt.text = "%s  Every decision is made. Try again to see how the other choices play out, or go on." % ("★".repeat(stars) + "☆".repeat(3 - stars))
+		choice_prompt.text = "Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % stars
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
 		clue_label.text = ""
@@ -476,7 +521,7 @@ func _show_step() -> void:
 			choice_prompt.text = "Who should %s, at %s? It needs %s." % [what, place, _needs(task)]
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
-	clue_label.text = "Clue: " + state.clue()
+	clue_label.text = "💡 " + state.clue()
 	selected = t
 
 # One word for how quickly a family member moves, and the role in the family's own terms.
