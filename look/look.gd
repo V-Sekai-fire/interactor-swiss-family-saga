@@ -27,6 +27,7 @@ const LIT := T.COLOR_LIT
 const PAGE := T.SPACE_PAGE
 const GAP := T.SPACE_GAP
 const FONTS := "res://fonts/"
+const EMOJI := "NotoColorEmoji.ttf"
 
 # The scheme. The constants above are the paper and ink colours, for code that needs a constant. Everything in this file
 # reads the scheme in use: call Look.scheme("observatory") before Look.make(), read Look.c("paper") where a colour is
@@ -159,10 +160,15 @@ static func fit(window: Window, design := Vector2i(T.WINDOW_DESIGN_WIDTH, T.WIND
 	window.content_scale_size = design
 	window.min_size = Vector2i(design.x / 2, design.y / 2)
 
+# Every font carries the emoji font as its fallback, so a symbol or emoji in a text draws on a browser too, which has no system font.
 static func font(file: String) -> FontFile:
 	var f := FontFile.new()
 	if f.load_dynamic_font(FONTS + file) != OK:
 		return null
+	if file != EMOJI:
+		var emoji := font(EMOJI)
+		if emoji != null:
+			f.fallbacks = [emoji]
 	return f
 
 static func box(bg: Color, radius: int, border := Color(0, 0, 0, 0), pad := 0) -> StyleBoxFlat:
@@ -315,3 +321,39 @@ static func fixed(l: Label, lines: int, width := 0) -> void:
 	var size := l.get_theme_font_size("font_size")
 	var h := (f.get_height(size) if f != null else size * 1.4) * lines + l.get_theme_constant("line_spacing") * (lines - 1)
 	l.custom_minimum_size = Vector2(width, ceil(h))
+
+# A label whose text may wrap to any number of lines: the card grows with it. Use fixed() when the card must not change size.
+static func wrapped(l: Label, width := 0) -> void:
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(width, 0)
+
+# A button that holds a sentence: left aligned, the text wraps rather than being cut off.
+static func row_button(b: Button) -> void:
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+# The kicker at the right end of a row, level with the baseline of a heading beside it.
+static func kicker_end(text: String) -> Label:
+	var l := kicker(text)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_vertical = Control.SIZE_SHRINK_END
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	return l
+
+# The shell of a full-window page: a vertical scroll that only acts when the window is too small, around the compact margin. Returns the box to fill.
+static func page(parent: Control) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parent.add_child(scroll)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, T.SPACE_PAGE_COMPACT)
+	scroll.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", GAP)
+	margin.add_child(box)
+	return box

@@ -56,29 +56,14 @@ var earliest_label: Label
 var perform_button: Button
 var island_edges: Array = []
 var hinted := -1
-var emoji_font: FontFile
 
 func _ready() -> void:
 	Look.fit(get_window())
 	var theme: Theme = Look.make()
-	_add_emoji_fallback(theme)
 	get_window().theme = theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	Look.sky(self)
-	# a window too small for the page scrolls it, never lets a card run past its box
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
-	var margin := MarginContainer.new()
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	for side in ["left", "top", "right", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 16)
-	scroll.add_child(margin)
-	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", Look.GAP)
-	margin.add_child(page)
+	var page := Look.page(self)
 
 	var top := HBoxContainer.new()
 	page.add_child(top)
@@ -86,10 +71,7 @@ func _ready() -> void:
 	title.text = "The Swiss Family Saga"
 	Look.heading(title, Look.T.FONT_SIZE_PANEL_HEADING)
 	top.add_child(title)
-	kicker = Look.kicker("")
-	kicker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	kicker.size_flags_vertical = Control.SIZE_SHRINK_END
+	kicker = Look.kicker_end("")
 	top.add_child(kicker)
 
 	var body := HBoxContainer.new()
@@ -138,9 +120,7 @@ func _ready() -> void:
 		var pick := Button.new()
 		pick.toggle_mode = true
 		_style_row(pick)
-		pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		pick.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		Look.row_button(pick)
 		pick.pressed.connect(_select_row.bind(t))
 		row.add_child(pick)
 		var who := Label.new()
@@ -268,7 +248,6 @@ func _ready() -> void:
 		if entry[0] == "Next":
 			next_button = button
 	_open_chapter()
-	_give_fallback_to_all(self)
 
 # A toggle that shows its state: outlined when off, inked when on (the design system's colours).
 func _style_toggle(b: Button) -> void:
@@ -292,33 +271,6 @@ func _style_row(b: Button) -> void:
 	b.add_theme_stylebox_override("hover_pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 2))
 	for colour_name in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(colour_name, Look.c("ink"))
-
-# Emoji and symbols the design system's fonts do not have come from Noto Color Emoji (OFL), added behind every font that is in use. A browser has no system font to fall back on.
-# The design system hands labels their own font objects, so the fallback is added to the theme's fonts and then to the fonts of every control once the screen is built.
-func _add_emoji_fallback(theme: Theme) -> void:
-	emoji_font = FontFile.new()
-	if emoji_font.load_dynamic_font("res://fonts/NotoColorEmoji.ttf") != OK:
-		emoji_font = null
-		return
-	if theme.default_font != null:
-		_give_fallback(theme.default_font)
-	for type in theme.get_font_type_list():
-		for font_name in theme.get_font_list(type):
-			_give_fallback(theme.get_font(font_name, type))
-
-func _give_fallback(font: Font) -> void:
-	if font != null and emoji_font != null and not font.fallbacks.has(emoji_font):
-		var fallbacks: Array[Font] = font.fallbacks.duplicate()
-		fallbacks.append(emoji_font)
-		font.fallbacks = fallbacks
-
-func _give_fallback_to_all(node: Node) -> void:
-	if node is Control:
-		for font_name in ["font", "normal_font", "bold_font"]:
-			if node.has_theme_font(font_name):
-				_give_fallback(node.get_theme_font(font_name))
-	for child in node.get_children():
-		_give_fallback_to_all(child)
 
 func _load(file: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string("res://conformance/%s.json" % file))

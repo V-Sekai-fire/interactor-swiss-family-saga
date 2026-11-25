@@ -5,6 +5,7 @@
 extends SceneTree
 
 const MainScene := preload("res://game/scenes/main.tscn")
+const LayoutDump := preload("res://look/layout_dump.gd")
 var out_path := "layout.json"
 var states: Array = []
 var scene: Control
@@ -48,35 +49,4 @@ func _settle() -> void:
 
 func _dump(name: String) -> void:
 	await _settle()
-	var nodes: Array = []
-	_collect(scene, "", nodes)
-	states.append({"name": name, "nodes": nodes})
-
-func _collect(node: Node, parent_path: String, nodes: Array) -> void:
-	var here := parent_path
-	if node is Control and node.is_visible_in_tree():
-		var control: Control = node
-		var rect := control.get_global_rect()
-		var minimum := control.get_combined_minimum_size()
-		var entry := {"path": str(scene.get_path_to(control)), "parent": parent_path, "cls": control.get_class(), "rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y],
-			"min": [minimum.x, minimum.y], "container": control is Container, "text": "", "text_width": 0.0, "autowrap": false, "lines": 0, "visible_lines": 0}
-		if control is Label or control is Button:
-			var text: String = control.text
-			var font: Font = control.get_theme_font("font")
-			var size: int = control.get_theme_font_size("font_size")
-			entry["text"] = text
-			entry["text_width"] = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x if text.find("\n") < 0 else _longest_line(font, text, size)
-			entry["autowrap"] = control.autowrap_mode != TextServer.AUTOWRAP_OFF
-		if control is Label:
-			entry["lines"] = control.get_line_count()
-			entry["visible_lines"] = control.get_visible_line_count()
-		nodes.append(entry)
-		here = entry["path"]
-	for child in node.get_children():
-		_collect(child, here, nodes)
-
-func _longest_line(font: Font, text: String, size: int) -> float:
-	var widest := 0.0
-	for line in text.split("\n"):
-		widest = max(widest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
-	return widest
+	states.append(LayoutDump.state(name, scene, scene))

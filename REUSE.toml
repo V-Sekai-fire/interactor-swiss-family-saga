@@ -6,7 +6,7 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 K. S. Ernest (iFire) Lee"
 SPDX-License-Identifier = "Apache-2.0 OR MIT"
 
-# The Chibifire design system (contract-design-chibifire, MIT), vendored from commit f4aca6b4a814de6908b600fb54a2e0e61af46370.
+# The Chibifire design system (contract-design-chibifire, MIT), vendored from commit 4b053b73fb42ddfe7b18948c9532c2db7c769939.
 [[annotations]]
 path = ["look/**"]
 precedence = "override"
