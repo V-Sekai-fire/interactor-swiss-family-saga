@@ -98,6 +98,7 @@ const SPACE_CARD_Y := 18 # Card padding, top and bottom.
 const SPACE_DOT := 10 # A navigation dot of a deck.
 const SPACE_GAP := 14 # Between cards, and between the rows of a page.
 const SPACE_PAGE := 28 # The margin of a tool window.
+const SPACE_PAGE_COMPACT := 16 # The margin of a window that holds a full game screen: two columns of cards in the design size with no room to spare.
 const WINDOW_COLUMN := 430 # The column of cards on the left.
 const WINDOW_DESIGN_HEIGHT := 780
 const WINDOW_DESIGN_WIDTH := 1180 # The size a panel is laid out for; the content scales from it to the real window.
