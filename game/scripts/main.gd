@@ -137,7 +137,7 @@ func _ready() -> void:
 	choice.add_child(choice_prompt)
 	for k in range(2):
 		var option := Button.new()
-		option.custom_minimum_size = Vector2(0, 62)
+		option.custom_minimum_size = Vector2(0, 76)
 		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_toggle(option)
@@ -435,7 +435,7 @@ func _restart() -> void:
 	_show_step()
 	_refresh()
 
-# What the player is asked now: the task, and two options.
+# What the player is asked now: a question about one task, and two answers that differ in something they can weigh.
 func _show_step() -> void:
 	var step: Dictionary = state.current_step()
 	if step.is_empty():
@@ -447,22 +447,51 @@ func _show_step() -> void:
 		return
 	var t: int = int(step["task"])
 	var task: Dictionary = state.world["tasks"][t]
-	choice_kicker.text = "CHOICE %d OF %d" % [int(step["index"]) + 1, int(step["total"])]
 	var what := str(task.get("name", "")).split(":")[0]
-	choice_prompt.text = "%s at %s%s. It needs %s." % [what.substr(0, 1).to_upper() + what.substr(1), IslandMap.NAMES[int(task["at"]) - 1], "" if bool(task["required"]) else " (optional)", _needs(task)]
+	var place: String = IslandMap.NAMES[int(task["at"]) - 1]
+	choice_kicker.text = "CHOICE %d OF %d" % [int(step["index"]) + 1, int(step["total"])]
+	match str(step["kind"]):
+		"perform":
+			choice_prompt.text = "%s, at %s. Do it properly for a bonus, or just take a quick look?" % [what.substr(0, 1).to_upper() + what.substr(1), place]
+		"skip":
+			choice_prompt.text = "Is it worth doing: %s, at %s? It is not needed to finish the chapter." % [what, place]
+		_:
+			choice_prompt.text = "Who should %s, at %s? It needs %s." % [what, place, _needs(task)]
 	for k in range(2):
-		option_buttons[k].text = _describe(step["options"][k])
+		option_buttons[k].text = _describe(step, k)
 	selected = t
 
-# An option in words: who, from when, and how.
-func _describe(option: Dictionary) -> String:
-	if bool(option.get("skip", false)):
-		return "Leave it for now\nNobody goes."
+# One word for how quickly a family member moves, and the role in the family's own terms.
+func _trait(c: int) -> String:
+	var info: Dictionary = state.world["chars"][c]
+	var speed := "quick on foot" if int(info["stride"]) >= 115 else ("steady on foot" if int(info["stride"]) >= 100 else "slower on foot")
+	return "%s: %s, %s%s" % [FAMILY[c], str(info["role"]), speed, ", can perform" if bool(info["perform"]) else ""]
+
+# An answer in words: what it is, and the facts that set it apart from the other answer.
+func _describe(step: Dictionary, k: int) -> String:
+	var option: Dictionary = step["options"][k]
+	var other: Dictionary = step["options"][1 - k]
+	var task: Dictionary = state.world["tasks"][int(step["task"])]
+	match str(step["kind"]):
+		"skip":
+			if bool(option.get("skip", false)):
+				return "Leave it\nNo one is spent on it."
+			return "Do it\nstarts at %d · takes %d · worth %d points" % [int(option["start"]), int(option["takes"]), int(task["points"])]
+		"perform":
+			if bool(option["performance"]):
+				return "Do it properly\ntakes %d · uses both arms · a bonus of %d" % [int(option["takes"]), int(task["bonus"])]
+			return "A quick look\ntakes %d · no bonus" % int(option["takes"])
 	var who: Array = []
 	for c in range(FAMILY.size()):
 		if (int(option["party"]) >> c) & 1 == 1:
 			who.append(FAMILY[c])
-	return "%s\nfrom time %d%s" % [" and ".join(who), int(option["start"]), ", performing it" if bool(option["performance"]) else ""]
+	# the member who differs between the two answers is the one to read about
+	var differing := -1
+	for c in range(FAMILY.size()):
+		if ((int(option["party"]) >> c) & 1) == 1 and ((int(other["party"]) >> c) & 1) == 0:
+			differing = c
+	var line := "%s\nstarts at %d · takes %d" % [" and ".join(who), int(option["start"]), int(option["takes"])]
+	return line + ("\n" + _trait(differing) if differing >= 0 else "")
 
 func _choose(k: int) -> void:
 	if state.choices_done():

@@ -327,7 +327,7 @@ func choices_done() -> bool:
 func current_step() -> Dictionary:
 	if choices_done():
 		return {}
-	return {"task": step_order[step_index], "index": step_index, "total": step_order.size(), "options": current_options}
+	return {"task": step_order[step_index], "index": step_index, "total": step_order.size(), "options": current_options, "kind": str(current_options[0].get("kind", current_options[1].get("kind", "who")))}
 
 # Takes the option the player picked (0 or 1); returns what it cost against the best way to carry on.
 func choose(k: int) -> Dictionary:
@@ -377,7 +377,7 @@ func _option_for(t: int, party: int, performance: bool, start: int, skip: bool) 
 	picks[t]["start"] = earliest_start(t) # the soonest slot where nobody is double-booked and the place has room
 	if start >= 0:
 		picks[t]["start"] = start
-	var option: Dictionary = {"task": t, "skip": false, "party": party, "start": int(picks[t]["start"]), "performance": bool(picks[t]["performance"])}
+	var option: Dictionary = {"task": t, "skip": false, "party": party, "start": int(picks[t]["start"]), "performance": bool(picks[t]["performance"]), "takes": duration(t)}
 	picks[t] = saved
 	return option
 
@@ -413,22 +413,22 @@ func _best_alternative(t: int, good_score: int) -> Dictionary:
 			var swapped: int = (good_party & ~(1 << c)) | (1 << d)
 			var option := _option_for(t, swapped, good_performance, -1, false)
 			option["why"] = "%s goes instead of %s" % [_name(d), _name(c)]
+			option["kind"] = "who"
+			option["swapped_in"] = d
+			option["swapped_out"] = c
 			candidates.append(option)
-	# start later than the soonest
 	var soonest := _option_for(t, good_party, good_performance, -1, false)
-	for delay in [2, 4, 8]:
-		var later := _option_for(t, good_party, good_performance, int(soonest["start"]) + delay, false)
-		later["why"] = "it starts %d later" % delay
-		candidates.append(later)
 	# a scout the best plan performs, done quickly instead
 	if task["kind"] == "scout" and good_performance:
 		var quick := _option_for(t, good_party, false, -1, false)
 		quick["why"] = "no performance, so no bonus"
+		quick["kind"] = "perform"
 		candidates.append(quick)
 	# an optional task the best plan does, left out
 	if not bool(task["required"]):
 		var skipped := _option_for(t, 0, false, -1, true)
 		skipped["why"] = "it is left out"
+		skipped["kind"] = "skip"
 		candidates.append(skipped)
 	var chosen: Dictionary = {}
 	var chosen_loss := 1 << 30

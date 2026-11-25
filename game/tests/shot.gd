@@ -35,6 +35,13 @@ func _process(_delta: float) -> bool:
 					if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
 						scene._member(c)
 			scene._select(1)
+		elif mode == "step1":
+			pass
+		elif mode == "step2":
+			scene._choose(0) # one decision taken, so the second question is on screen
+		elif mode == "step3":
+			scene._choose(0)
+			scene._choose(0)
 		elif mode == "choose":
 			# two choices taken: the first option, then the second
 			scene._choose(0)
