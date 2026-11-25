@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 # Solve one chapter's world with the Party Saga model of interactor-persona-frontier and print what the solver proved.
-# Usage: elixir tools/solve_level.exs CHAPTER [SOLVER] [LIMIT_S]   (the frontier checkout is found through FRONTIER_HOME)
-home = System.get_env("FRONTIER_HOME", "/mnt/fire/3-interactor/interactor-persona-frontier")
+# Usage: elixir tools/solve_level.exs CHAPTER [SOLVER] [LIMIT_S]   (FRONTIER_HOME is a checkout of interactor-persona-frontier and MINIZINC_HOME an unpacked MiniZinc 2.11)
+home = System.fetch_env!("FRONTIER_HOME")
 Code.require_file(Path.join(home, "tools/party_saga.exs"))
 Code.require_file(Path.expand("../levels/family.exs", __DIR__))
 [chapter | rest] = System.argv()

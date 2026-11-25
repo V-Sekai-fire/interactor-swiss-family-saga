@@ -3,8 +3,8 @@
 # Conformance fixtures for the plan checker in the game: for each chapter take the optimal plan, perturb it and ask the Party Saga model itself whether the perturbed plan is
 # allowed and what it scores. The checker in the game must give the same verdict and the same objective for every fixture (conformance/CHAPTER.json).
 # Usage: elixir tools/conformance.exs CHAPTER [PERTURBATIONS] [SEED]
-home = System.get_env("FRONTIER_HOME", "/mnt/fire/3-interactor/interactor-persona-frontier")
-minizinc = System.get_env("MINIZINC_HOME", "/mnt/fire/6-datasource/minizinc-bundle/x/MiniZincIDE-2.11.0-x86_64-linux-gnu")
+home = System.fetch_env!("FRONTIER_HOME")
+minizinc = System.fetch_env!("MINIZINC_HOME")
 Code.require_file(Path.join(home, "tools/party_saga.exs"))
 Code.require_file(Path.expand("../levels/family.exs", __DIR__))
 [chapter | rest] = System.argv()

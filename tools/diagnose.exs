@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 # Which task of a chapter cannot be done on its own? Each task is solved alone (the others are dropped); an unsatisfiable one is a fault in the level.
 # Usage: elixir tools/diagnose.exs CHAPTER
-home = System.get_env("FRONTIER_HOME", "/mnt/fire/3-interactor/interactor-persona-frontier")
+home = System.fetch_env!("FRONTIER_HOME")
 Code.require_file(Path.join(home, "tools/party_saga.exs"))
 Code.require_file(Path.expand("../levels/family.exs", __DIR__))
 [chapter] = System.argv()
