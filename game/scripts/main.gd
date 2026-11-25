@@ -36,6 +36,10 @@ var timeline: Control
 var premise: Label
 var verdict: Label
 var lost: Label
+var choice_kicker: Label
+var choice_prompt: Label
+var option_buttons: Array = []
+var edit_card: Control
 var note := ""
 var dot: ColorRect
 var task_rows: Array = []        # per task: {"button": Button, "who": Label}
@@ -123,7 +127,27 @@ func _ready() -> void:
 		row.add_child(who)
 		task_rows.append({"row": row, "button": pick, "who": who})
 
+	var choice := Look.card(right, "Your choice", "", 1)
+	choice_kicker = Look.kicker("")
+	choice.add_child(choice_kicker)
+	choice_prompt = Label.new()
+	Look.muted(choice_prompt, 13)
+	choice_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	choice_prompt.custom_minimum_size = Vector2(520, 0)
+	choice.add_child(choice_prompt)
+	for k in range(2):
+		var option := Button.new()
+		option.custom_minimum_size = Vector2(0, 62)
+		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_toggle(option)
+		option.pressed.connect(_choose.bind(k))
+		choice.add_child(option)
+		option_buttons.append(option)
+
 	var editor := Look.card(right, "Who does it, and when", "", 1)
+	edit_card = editor.get_parent()
+	edit_card.visible = false
 	detail = Label.new()
 	Look.muted(detail, 12)
 	Look.fixed(detail, 2, 520)
@@ -177,6 +201,15 @@ func _ready() -> void:
 	perform_button.pressed.connect(_perform)
 	timing.add_child(perform_button)
 
+	var aids := HBoxContainer.new()
+	aids.add_theme_constant_override("separation", 8)
+	editor.add_child(aids)
+	for entry in [["Hint", _hint], ["Tidy up", _tidy], ["Clear", _clear], ["Best plan", _best]]:
+		var aid := Button.new()
+		aid.text = entry[0]
+		aid.pressed.connect(entry[1])
+		aids.add_child(aid)
+
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", Look.GAP)
 	page.add_child(bar)
@@ -189,7 +222,7 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Hint", _hint], ["Tidy up", _tidy], ["Clear", _clear], ["Best plan", _best], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -226,12 +259,15 @@ func _open_chapter() -> void:
 	state.load_chapter(_load(CHAPTERS[chapter][0]))
 	if island_edges.is_empty():
 		island_edges = _load("ch07_cape")["world"]["edges"]
+	state.begin_choices()
+	note = ""
 	selected = 0
 	kicker.text = "CHAPTER %d OF %d · %s" % [chapter + 1, CHAPTERS.size(), str(CHAPTERS[chapter][1]).to_upper()]
 	premise.text = PREMISES[chapter]
 	map.set_world(state.world, island_edges)
 	for t in range(task_rows.size()):
 		task_rows[t]["row"].visible = t < state.task_count()
+	_show_step()
 	_refresh()
 
 func _go(step: int) -> void:
@@ -385,3 +421,57 @@ func _friendly(result: Dictionary) -> String:
 		"the task is outside its time window":
 			return "%s is out of its time window." % name
 	return str(result["reason"])
+
+# ---- two choices at a time ----
+
+func _toggle_edit() -> void:
+	edit_card.visible = not edit_card.visible
+	_refresh()
+
+func _restart() -> void:
+	note = ""
+	state.begin_choices()
+	selected = 0
+	_show_step()
+	_refresh()
+
+# What the player is asked now: the task, and two options.
+func _show_step() -> void:
+	var step: Dictionary = state.current_step()
+	if step.is_empty():
+		var stars: int = state.stars()
+		choice_kicker.text = "ALL CHOSEN"
+		choice_prompt.text = "%s  Every decision is made. Try again to see how the other choices play out, or go on." % ("★".repeat(stars) + "☆".repeat(3 - stars))
+		option_buttons[0].text = "Try again"
+		option_buttons[1].text = "Next chapter"
+		return
+	var t: int = int(step["task"])
+	var task: Dictionary = state.world["tasks"][t]
+	choice_kicker.text = "CHOICE %d OF %d" % [int(step["index"]) + 1, int(step["total"])]
+	var what := str(task.get("name", "")).split(":")[0]
+	choice_prompt.text = "%s at %s%s. It needs %s." % [what.substr(0, 1).to_upper() + what.substr(1), IslandMap.NAMES[int(task["at"]) - 1], "" if bool(task["required"]) else " (optional)", _needs(task)]
+	for k in range(2):
+		option_buttons[k].text = _describe(step["options"][k])
+	selected = t
+
+# An option in words: who, from when, and how.
+func _describe(option: Dictionary) -> String:
+	if bool(option.get("skip", false)):
+		return "Leave it for now\nNobody goes."
+	var who: Array = []
+	for c in range(FAMILY.size()):
+		if (int(option["party"]) >> c) & 1 == 1:
+			who.append(FAMILY[c])
+	return "%s\nfrom time %d%s" % [" and ".join(who), int(option["start"]), ", performing it" if bool(option["performance"]) else ""]
+
+func _choose(k: int) -> void:
+	if state.choices_done():
+		if k == 0:
+			_restart()
+		else:
+			_go(1)
+		return
+	var result: Dictionary = state.choose(k)
+	note = str(result["note"])
+	_show_step()
+	_refresh()

@@ -301,3 +301,146 @@ func _zone_fits(t: int, start: int, placed: Array) -> bool:
 		if arms > capacity:
 			return false
 	return true
+
+# ---- Two choices at a time ---------------------------------------------------------------------------------------------------------------------------------------
+# The chapter as a run of decisions. For each task the model's best plan does, taken in the order it starts them, the player picks one of two options: what the best plan
+# does there, or an alternative that still works but earns less. Both are scored by finishing the rest of the plan the way the best plan would, so the cost of a choice is exact.
+var step_order: Array = []
+var step_index := 0
+var current_options: Array = []
+
+# Starts the run of decisions on an empty plan.
+func begin_choices() -> void:
+	clear_all()
+	step_order = []
+	for t in range(task_count()):
+		if bool(best_plan["done"][t]):
+			step_order.append(t)
+	step_order.sort_custom(func(a, b): return int(best_plan["start"][a]) < int(best_plan["start"][b]) or (int(best_plan["start"][a]) == int(best_plan["start"][b]) and a < b))
+	step_index = 0
+	_prepare_step()
+
+func choices_done() -> bool:
+	return step_index >= step_order.size()
+
+# The step in front of the player: {"task", "index", "total", "options": [two options]}, or {} when the run is over.
+func current_step() -> Dictionary:
+	if choices_done():
+		return {}
+	return {"task": step_order[step_index], "index": step_index, "total": step_order.size(), "options": current_options}
+
+# Takes the option the player picked (0 or 1); returns what it cost against the best way to carry on.
+func choose(k: int) -> Dictionary:
+	var option: Dictionary = current_options[k]
+	var loss: int = int(option["loss"])
+	var note := "That is what the best plan does here." if loss == 0 else "That works, but it costs %d against the best plan: %s." % [loss, option["why"]]
+	_apply(step_order[step_index], option)
+	step_index += 1
+	_prepare_step()
+	return {"loss": loss, "note": note}
+
+func _apply(t: int, option: Dictionary) -> void:
+	if bool(option.get("skip", false)):
+		clear_task(t)
+		return
+	picks[t] = {"party": int(option["party"]), "start": int(option["start"]), "performance": bool(option["performance"])}
+	_respect_order()
+
+# Builds the two options for the current step, skipping steps that offer no real alternative.
+func _prepare_step() -> void:
+	current_options = []
+	while not choices_done():
+		var t: int = step_order[step_index]
+		var good := _option_for(t, int(best_plan["party"][t]), best_plan["how"][t] == "PERFORMANCE", -1, false)
+		var good_score := _completion_score(t, good)
+		good["loss"] = 0
+		good["why"] = ""
+		var alt := _best_alternative(t, good_score)
+		if alt.is_empty():
+			_apply(t, good) # nothing else to choose between: carry on
+			step_index += 1
+			continue
+		var flip: bool = (hash(str(world["tasks"][t].get("name", "")) + str(t)) & 1) == 1
+		current_options = [alt, good] if flip else [good, alt]
+		return
+
+# An option: who, when and how for a task, started as soon as the people can be there unless a start is given. A skip leaves the task out.
+func _option_for(t: int, party: int, performance: bool, start: int, skip: bool) -> Dictionary:
+	if skip:
+		return {"task": t, "skip": true, "party": 0, "start": 0, "performance": false}
+	var saved: Dictionary = picks[t].duplicate()
+	picks[t] = {"party": 0, "start": 0, "performance": false}
+	for c in range(world["chars"].size()):
+		if (party >> c) & 1 == 1:
+			toggle_member(t, c)
+	picks[t]["performance"] = performance and world["tasks"][t]["kind"] == "scout"
+	picks[t]["start"] = earliest_start(t) # the soonest slot where nobody is double-booked and the place has room
+	if start >= 0:
+		picks[t]["start"] = start
+	var option: Dictionary = {"task": t, "skip": false, "party": party, "start": int(picks[t]["start"]), "performance": bool(picks[t]["performance"])}
+	picks[t] = saved
+	return option
+
+# The score of the plan if this option is taken and every task after it is done the way the best plan does it; -999999 when that plan does not work.
+func _completion_score(t: int, option: Dictionary) -> int:
+	var trial = get_script().new()
+	trial.world = world
+	trial.best_plan = best_plan
+	trial.best_objective = best_objective
+	trial.distances = distances
+	trial.picks = picks.duplicate(true)
+	trial.step_order = step_order
+	trial._apply(t, option)
+	for i in range(step_index + 1, step_order.size()):
+		var u: int = step_order[i]
+		trial._apply(u, trial._option_for(u, int(best_plan["party"][u]), best_plan["how"][u] == "PERFORMANCE", -1, false))
+	var v: Dictionary = trial.verdict()
+	return int(v["score"]) if v["allowed"] else -999999
+
+# The alternative that costs the least but still costs something: a close call is the most interesting choice.
+func _best_alternative(t: int, good_score: int) -> Dictionary:
+	var task: Dictionary = world["tasks"][t]
+	var good_party := int(best_plan["party"][t])
+	var good_performance: bool = best_plan["how"][t] == "PERFORMANCE"
+	var candidates: Array = []
+	# swap a member for another of the same role, who can reach
+	for c in range(world["chars"].size()):
+		if (good_party >> c) & 1 == 0:
+			continue
+		for d in range(world["chars"].size()):
+			if (good_party >> d) & 1 == 1 or world["chars"][d]["role"] != world["chars"][c]["role"] or int(world["chars"][d]["reach"]) < int(task["reach"]):
+				continue
+			var swapped: int = (good_party & ~(1 << c)) | (1 << d)
+			var option := _option_for(t, swapped, good_performance, -1, false)
+			option["why"] = "%s goes instead of %s" % [_name(d), _name(c)]
+			candidates.append(option)
+	# start later than the soonest
+	var soonest := _option_for(t, good_party, good_performance, -1, false)
+	for delay in [2, 4, 8]:
+		var later := _option_for(t, good_party, good_performance, int(soonest["start"]) + delay, false)
+		later["why"] = "it starts %d later" % delay
+		candidates.append(later)
+	# a scout the best plan performs, done quickly instead
+	if task["kind"] == "scout" and good_performance:
+		var quick := _option_for(t, good_party, false, -1, false)
+		quick["why"] = "no performance, so no bonus"
+		candidates.append(quick)
+	# an optional task the best plan does, left out
+	if not bool(task["required"]):
+		var skipped := _option_for(t, 0, false, -1, true)
+		skipped["why"] = "it is left out"
+		candidates.append(skipped)
+	var chosen: Dictionary = {}
+	var chosen_loss := 1 << 30
+	for option in candidates:
+		var score := _completion_score(t, option)
+		var loss := good_score - score
+		if score > -999999 and loss > 0 and loss < chosen_loss:
+			chosen = option
+			chosen_loss = loss
+	if not chosen.is_empty():
+		chosen["loss"] = chosen_loss
+	return chosen
+
+func _name(c: int) -> String:
+	return ["Father", "Mother", "Fritz", "Ernest", "Jack", "Francis"][c]

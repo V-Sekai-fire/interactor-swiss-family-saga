@@ -35,6 +35,10 @@ func _process(_delta: float) -> bool:
 					if (int(scene.state.best_plan["party"][t]) >> c) & 1 == 1:
 						scene._member(c)
 			scene._select(1)
+		elif mode == "choose":
+			# two choices taken: the first option, then the second
+			scene._choose(0)
+			scene._choose(1)
 		elif mode == "hint":
 			# a player who is stuck asks for three hints
 			for _i in range(3):
