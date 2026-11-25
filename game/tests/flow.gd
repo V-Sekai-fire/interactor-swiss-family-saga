@@ -44,7 +44,7 @@ func _initialize() -> void:
 		while not scene.state.choices_done():
 			scene._choose(0)
 			await process_frame
-		_check(not scene.next_button.disabled, "chapter %d: Next opens when every decision is made" % (chapter + 1))
+		_check(scene.next_button.disabled == (chapter == 7), "chapter %d: Next opens when every decision is made, except on the last chapter" % (chapter + 1))
 	scene.chapter = 0
 	scene._open_chapter()
 	await process_frame
@@ -60,6 +60,21 @@ func _initialize() -> void:
 	_check(scene.state.current_step()["index"] == 0, "Restart goes back to the first decision")
 	_check(scene.next_button.disabled, "Restart locks Next again")
 	_check(scene.console_lines.size() == 1, "Restart clears the console")
+	# The chapters are a line: Previous on the first and Next on the last do nothing and are disabled
+	scene.chapter = 0
+	scene._open_chapter()
+	await process_frame
+	_check(scene.previous_button.disabled, "Previous is disabled on the first chapter")
+	scene._go(-1)
+	_check(scene.chapter == 0, "Previous on the first chapter stays on it")
+	scene.chapter = 7
+	scene._open_chapter()
+	while not scene.state.choices_done():
+		scene._choose(0)
+	await process_frame
+	_check(scene.next_button.disabled and not scene.previous_button.disabled, "Next is disabled on the last chapter even when it is done")
+	scene._go(1)
+	_check(scene.chapter == 7, "Next on the last chapter stays on it")
 	# Two levels of help, both off at the start: Hint (one-shot) makes this question's clue readable, Solve (a toggle) rings the better answer on every question until turned off
 	scene.chapter = 0
 	scene._open_chapter()

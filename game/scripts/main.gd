@@ -38,6 +38,7 @@ var verdict: Label
 var console: Label
 var console_lines: Array = []
 var next_button: Button
+var previous_button: Button
 var row_task: Array = []
 var choice_kicker: Label
 var choice_prompt: Label
@@ -252,6 +253,8 @@ func _ready() -> void:
 		bar.add_child(button)
 		if entry[0] == "Next":
 			next_button = button
+		if entry[0] == "Previous":
+			previous_button = button
 		if entry[0] == "Hint":
 			hint_button = button
 		if entry[0] == "Solve":
@@ -314,12 +317,16 @@ func _open_chapter() -> void:
 func _chapter_done() -> bool:
 	return state.choices_done() or (edit_card.visible and bool(state.verdict()["allowed"]))
 
+# The chapters are a line, not a ring: there is nothing before the first or after the last.
 func _go(step: int) -> void:
+	var target := chapter + step
+	if target < 0 or target >= CHAPTERS.size():
+		return
 	if step > 0 and not _chapter_done():
 		_say("Finish this chapter before going on.")
 		_refresh()
 		return
-	chapter = posmod(chapter + step, CHAPTERS.size())
+	chapter = target
 	_open_chapter()
 
 func _select_row(r: int) -> void:
@@ -468,7 +475,8 @@ func _refresh() -> void:
 	perform_button.visible = task["kind"] == "scout"
 	perform_button.disabled = not assigned
 	perform_button.set_pressed_no_signal(bool(state.picks[selected]["performance"]))
-	next_button.disabled = not _chapter_done()
+	next_button.disabled = not _chapter_done() or chapter >= CHAPTERS.size() - 1
+	previous_button.disabled = chapter <= 0
 	timeline.selected = selected
 	timeline.flagged = flagged
 	timeline.refresh()
