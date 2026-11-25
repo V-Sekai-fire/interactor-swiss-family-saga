@@ -26,6 +26,10 @@ func _init() -> void:
 				var step: Dictionary = s.current_step()
 				if step["options"].size() != 2:
 					two_each = false
+				var wrong := 0
+				for o in step["options"]:
+					wrong = max(wrong, int(o["loss"]))
+				_check("%s/%s: a decision costs at least %d" % [chapter, policy, State.MIN_COST], wrong >= State.MIN_COST)
 				var k := 0
 				for i in range(2):
 					var loss: int = int(step["options"][i]["loss"])
@@ -39,6 +43,7 @@ func _init() -> void:
 				steps += 1
 			var v: Dictionary = s.verdict()
 			_check("%s/%s: every step offers two options" % [chapter, policy], two_each)
+			_check("%s/%s: the chapter has at least two decisions (%d)" % [chapter, policy, steps], steps >= 2)
 			_check("%s/%s: the finished plan works" % [chapter, policy], v["allowed"])
 			if policy == "best":
 				_check("%s/best: the best options reach the best plan" % chapter, v["allowed"] and v["score"] == s.best_score())

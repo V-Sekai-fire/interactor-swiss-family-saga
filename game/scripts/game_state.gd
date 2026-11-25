@@ -308,6 +308,9 @@ func _zone_fits(t: int, start: int, placed: Array) -> bool:
 var step_order: Array = []
 var step_index := 0
 var current_options: Array = []
+var candidate_losses: Array = []
+# A decision is only worth asking when the wrong answer costs this much of the score; smaller differences are carried out for the player.
+const MIN_COST := 5
 
 # Starts the run of decisions on an empty plan.
 func begin_choices() -> void:
@@ -397,7 +400,7 @@ func _completion_score(t: int, option: Dictionary) -> int:
 	var v: Dictionary = trial.verdict()
 	return int(v["score"]) if v["allowed"] else -999999
 
-# The alternative that costs the least but still costs something: a close call is the most interesting choice.
+# The alternative that costs the least among those that cost enough to matter: a close call, but one that changes the score.
 func _best_alternative(t: int, good_score: int) -> Dictionary:
 	var task: Dictionary = world["tasks"][t]
 	var good_party := int(best_plan["party"][t])
@@ -432,10 +435,13 @@ func _best_alternative(t: int, good_score: int) -> Dictionary:
 		candidates.append(skipped)
 	var chosen: Dictionary = {}
 	var chosen_loss := 1 << 30
+	candidate_losses = []
 	for option in candidates:
 		var score := _completion_score(t, option)
 		var loss := good_score - score
-		if score > -999999 and loss > 0 and loss < chosen_loss:
+		if score > -999999:
+			candidate_losses.append(loss)
+		if score > -999999 and loss >= MIN_COST and loss < chosen_loss:
 			chosen = option
 			chosen_loss = loss
 	if not chosen.is_empty():

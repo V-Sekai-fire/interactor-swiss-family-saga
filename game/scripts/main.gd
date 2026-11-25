@@ -38,6 +38,7 @@ var verdict: Label
 var lost: Label
 var choice_kicker: Label
 var choice_prompt: Label
+var rule: Label
 var option_buttons: Array = []
 var edit_card: Control
 var note := ""
@@ -137,13 +138,19 @@ func _ready() -> void:
 	choice.add_child(choice_prompt)
 	for k in range(2):
 		var option := Button.new()
-		option.custom_minimum_size = Vector2(0, 76)
+		option.custom_minimum_size = Vector2(0, 62)
 		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_toggle(option)
 		option.pressed.connect(_choose.bind(k))
 		choice.add_child(option)
 		option_buttons.append(option)
+
+	rule = Label.new()
+	Look.muted(rule, Look.T.FONT_SIZE_HINT)
+	rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rule.custom_minimum_size = Vector2(520, 0)
+	choice.add_child(rule)
 
 	var editor := Look.card(right, "Who does it, and when", "", 1)
 	edit_card = editor.get_parent()
@@ -244,11 +251,11 @@ func _style_toggle(b: Button) -> void:
 
 # A row of the task list: bare when it is not the one being planned, ringed when it is.
 func _style_row(b: Button) -> void:
-	var bare := Look.box(Color(0, 0, 0, 0), 8, Color(0, 0, 0, 0), 6)
+	var bare := Look.box(Color(0, 0, 0, 0), 8, Color(0, 0, 0, 0), 2)
 	b.add_theme_stylebox_override("normal", bare)
-	b.add_theme_stylebox_override("hover", Look.box(Color(Look.c("paper"), 0.6), 8, Color(0, 0, 0, 0), 6))
-	b.add_theme_stylebox_override("pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 6))
-	b.add_theme_stylebox_override("hover_pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 6))
+	b.add_theme_stylebox_override("hover", Look.box(Color(Look.c("paper"), 0.6), 8, Color(0, 0, 0, 0), 2))
+	b.add_theme_stylebox_override("pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 2))
+	b.add_theme_stylebox_override("hover_pressed", Look.box(Look.c("paper"), 8, Look.c("ink"), 2))
 	for colour_name in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(colour_name, Look.c("ink"))
 
@@ -449,6 +456,7 @@ func _show_step() -> void:
 	var task: Dictionary = state.world["tasks"][t]
 	var what := str(task.get("name", "")).split(":")[0]
 	var place: String = IslandMap.NAMES[int(task["at"]) - 1]
+	rule.text = "Score = what the tasks add, minus the time taken. Best: %d." % state.best_score()
 	choice_kicker.text = "CHOICE %d OF %d" % [int(step["index"]) + 1, int(step["total"])]
 	match str(step["kind"]):
 		"perform":
@@ -467,6 +475,13 @@ func _trait(c: int) -> String:
 	var speed := "quick on foot" if int(info["stride"]) >= 115 else ("steady on foot" if int(info["stride"]) >= 100 else "slower on foot")
 	return "%s: %s, %s%s" % [FAMILY[c], str(info["role"]), speed, ", can perform" if bool(info["perform"]) else ""]
 
+# What a task adds to the score: its points count double, and a bonus counts as it is for a duty or a task done properly.
+func _worth(task: Dictionary, performed: bool) -> int:
+	var v: int = int(state.world["point_weight"]) * int(task["points"])
+	if task["kind"] == "duty" or performed:
+		v += int(task["bonus"])
+	return v
+
 # An answer in words: what it is, and the facts that set it apart from the other answer.
 func _describe(step: Dictionary, k: int) -> String:
 	var option: Dictionary = step["options"][k]
@@ -476,11 +491,11 @@ func _describe(step: Dictionary, k: int) -> String:
 		"skip":
 			if bool(option.get("skip", false)):
 				return "Leave it\nNo one is spent on it."
-			return "Do it\nstarts at %d · takes %d · worth %d points" % [int(option["start"]), int(option["takes"]), int(task["points"])]
+			return "Do it\nadds %d to the score · takes %d" % [_worth(task, bool(state.best_plan["how"][int(step["task"])] == "PERFORMANCE")), int(option["takes"])]
 		"perform":
 			if bool(option["performance"]):
-				return "Do it properly\ntakes %d · uses both arms · a bonus of %d" % [int(option["takes"]), int(task["bonus"])]
-			return "A quick look\ntakes %d · no bonus" % int(option["takes"])
+				return "Do it properly\ntakes %d · adds %d to the score" % [int(option["takes"]), _worth(task, true)]
+			return "A quick look\ntakes %d · adds %d to the score" % [int(option["takes"]), _worth(task, false)]
 	var who: Array = []
 	for c in range(FAMILY.size()):
 		if (int(option["party"]) >> c) & 1 == 1:
