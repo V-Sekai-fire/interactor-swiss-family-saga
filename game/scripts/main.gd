@@ -57,7 +57,10 @@ var perform_button: Button
 var island_edges: Array = []
 var hinted := -1
 var hints_on := false
+var solve_on := false
 var hint_button: Button
+var solve_button: Button
+var clue_text := ""
 
 func _ready() -> void:
 	Look.fit(get_window())
@@ -242,17 +245,20 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Hints", _hint], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Hint", _hint], ["Solve", _solve], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
 		bar.add_child(button)
 		if entry[0] == "Next":
 			next_button = button
-		if entry[0] == "Hints":
+		if entry[0] == "Hint" or entry[0] == "Solve":
 			button.toggle_mode = true
 			_style_toggle(button)
-			hint_button = button
+			if entry[0] == "Hint":
+				hint_button = button
+			else:
+				solve_button = button
 	_open_chapter()
 
 # A toggle that shows its state: outlined when off, inked when on (the design system's colours).
@@ -355,22 +361,37 @@ func _soonest() -> void:
 	state.start_earliest(selected)
 	_refresh()
 
+# The clue is in place from the first question but unreadable (a dot for each letter, so the card keeps its size) until hints are on.
+func _show_clue() -> void:
+	clue_label.visible = not state.choices_done()
+	clue_label.text = "💡 " + (clue_text if hints_on else _masked(clue_text))
+
+func _masked(text: String) -> String:
+	var out := ""
+	for i in range(text.length()):
+		out += text[i] if text[i] == " " else "·"
+	return out
+
 # The better of the two answers in front of the player: the one that loses nothing.
 func _better_answer() -> int:
 	return 0 if int(state.current_step()["options"][0]["loss"]) == 0 else 1
 
-# Hints are off until the player turns them on: they show the clue and ring the better answer; on the free board they name the next piece of the best plan.
+# Two levels of help, both off at the start. Hint makes the clue readable (it says what to weigh); Solve marks the better answer, or on the free board names the next piece of the best plan.
 func _hint() -> void:
 	hints_on = hint_button.button_pressed
-	clue_label.visible = hints_on and not state.choices_done()
-	if not hints_on:
+	_show_clue()
+	_refresh()
+
+func _solve() -> void:
+	solve_on = solve_button.button_pressed
+	if not solve_on:
 		hinted = -1
 		_ring_hint()
 		_refresh()
 		return
 	if not edit_card.visible and not state.choices_done():
 		hinted = _better_answer()
-		note = "Hint: the %s answer is the better one." % ("top" if hinted == 0 else "bottom")
+		note = "Solve: the %s answer is the better one." % ("top" if hinted == 0 else "bottom")
 		_refresh()
 		_ring_hint()
 		return
@@ -383,7 +404,7 @@ func _hint() -> void:
 		for c in range(FAMILY.size()):
 			if (int(h["party"]) >> c) & 1 == 1:
 				who.append(FAMILY[c])
-		note = "Hint: %s %s “%s”, from time %d%s." % [" and ".join(who), "do" if who.size() > 1 else "does", str(state.world["tasks"][selected].get("name", "")).split(":")[0], int(h["start"]), ", performing it" if bool(h["performance"]) else ""]
+		note = "Solve: %s %s “%s”, from time %d%s." % [" and ".join(who), "do" if who.size() > 1 else "does", str(state.world["tasks"][selected].get("name", "")).split(":")[0], int(h["start"]), ", performing it" if bool(h["performance"]) else ""]
 	_refresh()
 
 func _tidy() -> void:
@@ -538,7 +559,7 @@ func _show_step() -> void:
 		choice_prompt.text = "%s  Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % [_stars_text(stars), stars]
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
-		clue_label.text = ""
+		clue_text = ""
 		clue_label.visible = false
 		_say(_where_it_went(state.regret()))
 		return
@@ -558,9 +579,9 @@ func _show_step() -> void:
 	hinted = -1
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
-	clue_label.text = "💡 " + state.clue()
-	clue_label.visible = hints_on
-	if hints_on:
+	clue_text = state.clue()
+	_show_clue()
+	if solve_on:
 		hinted = _better_answer()
 	_ring_hint()
 	selected = t
