@@ -56,6 +56,8 @@ var earliest_label: Label
 var perform_button: Button
 var island_edges: Array = []
 var hinted := -1
+var hints_on := false
+var hint_button: Button
 
 func _ready() -> void:
 	Look.fit(get_window())
@@ -240,13 +242,17 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Hint", _hint], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Hints", _hint], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
 		bar.add_child(button)
 		if entry[0] == "Next":
 			next_button = button
+		if entry[0] == "Hints":
+			button.toggle_mode = true
+			_style_toggle(button)
+			hint_button = button
 	_open_chapter()
 
 # A toggle that shows its state: outlined when off, inked when on (the design system's colours).
@@ -349,13 +355,22 @@ func _soonest() -> void:
 	state.start_earliest(selected)
 	_refresh()
 
+# The better of the two answers in front of the player: the one that loses nothing.
+func _better_answer() -> int:
+	return 0 if int(state.current_step()["options"][0]["loss"]) == 0 else 1
+
+# Hints are off until the player turns them on: they show the clue and ring the better answer; on the free board they name the next piece of the best plan.
 func _hint() -> void:
-	# in a decision the hint points at the better answer; on the free board it places the next piece of the best plan
+	hints_on = hint_button.button_pressed
+	clue_label.visible = hints_on and not state.choices_done()
+	if not hints_on:
+		hinted = -1
+		_ring_hint()
+		_refresh()
+		return
 	if not edit_card.visible and not state.choices_done():
-		var step: Dictionary = state.current_step()
-		var better := 0 if int(step["options"][0]["loss"]) == 0 else 1
-		note = "Hint: the %s answer is the better one." % ("top" if better == 0 else "bottom")
-		hinted = better
+		hinted = _better_answer()
+		note = "Hint: the %s answer is the better one." % ("top" if hinted == 0 else "bottom")
 		_refresh()
 		_ring_hint()
 		return
@@ -524,6 +539,7 @@ func _show_step() -> void:
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
 		clue_label.text = ""
+		clue_label.visible = false
 		_say(_where_it_went(state.regret()))
 		return
 	var t: int = int(step["task"])
@@ -543,6 +559,10 @@ func _show_step() -> void:
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
 	clue_label.text = "💡 " + state.clue()
+	clue_label.visible = hints_on
+	if hints_on:
+		hinted = _better_answer()
+	_ring_hint()
 	selected = t
 
 # Earned stars as emoji, with an empty circle for each one not yet earned.
