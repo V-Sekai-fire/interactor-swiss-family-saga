@@ -252,13 +252,12 @@ func _ready() -> void:
 		bar.add_child(button)
 		if entry[0] == "Next":
 			next_button = button
-		if entry[0] == "Hint" or entry[0] == "Solve":
+		if entry[0] == "Hint":
+			hint_button = button
+		if entry[0] == "Solve":
 			button.toggle_mode = true
 			_style_toggle(button)
-			if entry[0] == "Hint":
-				hint_button = button
-			else:
-				solve_button = button
+			solve_button = button
 	_open_chapter()
 
 # A toggle that shows its state: outlined when off, inked when on (the design system's colours).
@@ -376,9 +375,9 @@ func _masked(text: String) -> String:
 func _better_answer() -> int:
 	return 0 if int(state.current_step()["options"][0]["loss"]) == 0 else 1
 
-# Two levels of help, both off at the start. Hint makes the clue readable (it says what to weigh); Solve marks the better answer, or on the free board names the next piece of the best plan.
+# Two levels of help, both off at the start. Hint is a one-shot: it makes the clue of this question readable (it says what to weigh) and the next question masks it again; Solve marks the better answer, or on the free board names the next piece of the best plan.
 func _hint() -> void:
-	hints_on = hint_button.button_pressed
+	hints_on = true
 	_show_clue()
 	_refresh()
 
@@ -580,6 +579,7 @@ func _show_step() -> void:
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
 	clue_text = state.clue()
+	hints_on = false
 	_show_clue()
 	if solve_on:
 		hinted = _better_answer()
