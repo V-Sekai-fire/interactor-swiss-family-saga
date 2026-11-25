@@ -54,5 +54,23 @@ func _initialize() -> void:
 	_check(scene.state.current_step()["index"] == 0, "Restart goes back to the first decision")
 	_check(scene.next_button.disabled, "Restart locks Next again")
 	_check(scene.console_lines.size() == 1, "Restart clears the console")
+	# Hints are hidden until the toggle is on, and then show the clue and ring the better answer, also on the next question
+	scene.chapter = 0
+	scene._open_chapter()
+	await process_frame
+	_check(not scene.hint_button.button_pressed and not scene.clue_label.visible, "hints are off and the clue is hidden at the start")
+	_check(not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed, "no answer is ringed while hints are off")
+	scene.hint_button.button_pressed = true
+	scene._hint()
+	await process_frame
+	var better: int = scene._better_answer()
+	_check(scene.clue_label.visible and scene.option_buttons[better].button_pressed, "hints on: the clue shows and the better answer is ringed")
+	scene._choose(better)
+	await process_frame
+	_check(scene.clue_label.visible and scene.option_buttons[scene._better_answer()].button_pressed, "hints stay on for the next question")
+	scene.hint_button.button_pressed = false
+	scene._hint()
+	await process_frame
+	_check(not scene.clue_label.visible and not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed, "hints off again: the clue is hidden and nothing is ringed")
 	print("RESULT: %d failures" % failures)
 	quit(1 if failures > 0 else 0)
