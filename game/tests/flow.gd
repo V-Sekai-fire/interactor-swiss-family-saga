@@ -12,6 +12,12 @@ func _check(ok: bool, what: String) -> void:
 		failures += 1
 		print("FAIL: ", what)
 
+func _has_letters(text: String) -> bool:
+	for i in range(text.length()):
+		if text[i].to_lower() != text[i].to_upper():
+			return true
+	return false
+
 func _initialize() -> void:
 	root.size = Vector2i(1180, 780)
 	var scene: Control = MainScene.instantiate()
@@ -54,23 +60,31 @@ func _initialize() -> void:
 	_check(scene.state.current_step()["index"] == 0, "Restart goes back to the first decision")
 	_check(scene.next_button.disabled, "Restart locks Next again")
 	_check(scene.console_lines.size() == 1, "Restart clears the console")
-	# Hints are hidden until the toggle is on, and then show the clue and ring the better answer, also on the next question
+	# Two levels of help, both off at the start: Hint makes the clue readable, Solve rings the better answer, on every question until turned off
 	scene.chapter = 0
 	scene._open_chapter()
 	await process_frame
-	_check(not scene.hint_button.button_pressed and not scene.clue_label.visible, "hints are off and the clue is hidden at the start")
-	_check(not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed, "no answer is ringed while hints are off")
+	var none := func(): return not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed
+	_check(not scene.hint_button.button_pressed and not scene.solve_button.button_pressed, "both help levels are off at the start")
+	_check(scene.clue_label.visible and not _has_letters(scene.clue_label.text.substr(2)), "the clue is there but unreadable at the start")
+	_check(none.call(), "no answer is ringed at the start")
 	scene.hint_button.button_pressed = true
 	scene._hint()
 	await process_frame
+	_check(_has_letters(scene.clue_label.text) and none.call(), "Hint: the clue is readable and no answer is ringed")
+	scene.solve_button.button_pressed = true
+	scene._solve()
+	await process_frame
 	var better: int = scene._better_answer()
-	_check(scene.clue_label.visible and scene.option_buttons[better].button_pressed, "hints on: the clue shows and the better answer is ringed")
+	_check(scene.option_buttons[better].button_pressed and not scene.option_buttons[1 - better].button_pressed, "Solve: the better answer is ringed")
 	scene._choose(better)
 	await process_frame
-	_check(scene.clue_label.visible and scene.option_buttons[scene._better_answer()].button_pressed, "hints stay on for the next question")
+	_check(_has_letters(scene.clue_label.text) and scene.option_buttons[scene._better_answer()].button_pressed, "both stay on for the next question")
 	scene.hint_button.button_pressed = false
 	scene._hint()
+	scene.solve_button.button_pressed = false
+	scene._solve()
 	await process_frame
-	_check(not scene.clue_label.visible and not scene.option_buttons[0].button_pressed and not scene.option_buttons[1].button_pressed, "hints off again: the clue is hidden and nothing is ringed")
+	_check(not _has_letters(scene.clue_label.text.substr(2)) and none.call(), "both off again: the clue is unreadable and nothing is ringed")
 	print("RESULT: %d failures" % failures)
 	quit(1 if failures > 0 else 0)
