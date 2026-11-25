@@ -38,3 +38,10 @@ path = ["conformance/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 K. S. Ernest (iFire) Lee"
 SPDX-License-Identifier = "Apache-2.0 OR MIT"
+
+# Noto Color Emoji (googlefonts/noto-emoji at commit 99701e07d3d1fe1bdbcdb14964547f0fd592966f), the fallback for emoji and symbols the design system's fonts lack.
+[[annotations]]
+path = ["fonts/NotoColorEmoji.ttf", "fonts/OFL-Noto-Color-Emoji.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2013 Google LLC"
+SPDX-License-Identifier = "OFL-1.1"
