@@ -554,6 +554,11 @@ func _restart() -> void:
 	note = ""
 	state.begin_choices()
 	selected = 0
+	hinted = -1
+	edit_card.visible = false
+	choice_card.visible = true
+	console_lines = []
+	_say("Started the chapter again.")
 	_show_step()
 	_refresh()
 
