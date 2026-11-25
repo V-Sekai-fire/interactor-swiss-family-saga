@@ -1,6 +1,6 @@
 # Playing and checking the game
 
-Run it with a Godot 4 build: `godot --path . --resolution 1180x780`. Each of the eight chapters is a run of two-option decisions; every question has a clue on its card, and
+Play it in the browser at https://v-sekai-fire.github.io/interactor-swiss-family-saga/ (built by the `pages` workflow on every push to `main`), or run it with a Godot 4.6 build: `godot --path . --resolution 1180x780`. Each of the eight chapters is a run of two-option decisions; every question has a clue on its card, and
 **Edit by hand** opens the free board (any plan may be built, the checker names the first rule it breaks). The score is what the tasks add minus the time taken; the best plan
 of each chapter was proved optimal by a MiniZinc solver, and the game shows where a plan loses points against it.
 
