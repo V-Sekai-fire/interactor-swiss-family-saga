@@ -9,7 +9,6 @@ const CheckerScript := preload("res://game/scripts/checker.gd")
 const IslandMap := preload("res://game/scripts/island_map.gd")
 const State := preload("res://game/scripts/game_state.gd")
 const Timeline := preload("res://game/scripts/timeline.gd")
-const Mark := preload("res://game/scripts/mark.gd")
 const CHAPTERS := [
 	["ch01_landing", "The landing"], ["ch02_falconhurst", "Falconhurst"], ["ch03_boat", "The tub boat"], ["ch04_rockburg", "Rockburg"],
 	["ch05_stairs", "Stairs and the bridge"], ["ch06_farms", "Farms and the pinnace"], ["ch07_cape", "Cape Minster"], ["ch08_ship", "The ship"],
@@ -45,8 +44,7 @@ var option_buttons: Array = []
 var edit_card: Control
 var note := ""
 var dot: ColorRect
-var task_rows: Array = []        # per task: {"row", "mark", "button", "who"}
-var star_marks: Array = []
+var task_rows: Array = []        # per task: {"row", "button", "who"}
 var detail: Label
 var member_buttons: Array = []
 var start_label: Label
@@ -119,8 +117,6 @@ func _ready() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		tasks_box.add_child(row)
-		var mark := Mark.new("duty")
-		row.add_child(mark)
 		var pick := Button.new()
 		pick.toggle_mode = true
 		_style_row(pick)
@@ -134,7 +130,7 @@ func _ready() -> void:
 		Look.fixed(who, 1, 190)
 		who.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(who)
-		task_rows.append({"row": row, "mark": mark, "button": pick, "who": who})
+		task_rows.append({"row": row, "button": pick, "who": who})
 
 	var choice := Look.card(right, "Your choice", "", 1)
 	choice_kicker = Look.kicker("")
@@ -239,10 +235,6 @@ func _ready() -> void:
 	dot.custom_minimum_size = Vector2(12, 12)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(dot)
-	for _i in range(3):
-		var star := Mark.new("star_empty")
-		bar.add_child(star)
-		star_marks.append(star)
 	verdict = Label.new()
 	Look.muted(verdict, 13)
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -398,8 +390,7 @@ func _refresh() -> void:
 	for t in range(state.task_count()):
 		var task: Dictionary = state.world["tasks"][t]
 		var pick: Button = task_rows[t]["button"]
-		pick.text = str(task.get("name", "")).split(":")[0]
-		task_rows[t]["mark"].set_shape("duty" if task["kind"] == "duty" else "scout")
+		pick.text = "%s  %s" % ["⬛" if task["kind"] == "duty" else "🔵", str(task.get("name", "")).split(":")[0]]
 		pick.set_pressed_no_signal(t == selected)
 		var names: Array = []
 		for c in state.members(t):
@@ -425,16 +416,12 @@ func _refresh() -> void:
 		var best: int = state.best_score()
 		dot.color = Look.c("good")
 		var stars: int = state.stars()
-		verdict.text = "✅ Works · done by time %d · score %d of %d%s" % [int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
-		for i in range(3):
-			star_marks[i].visible = true
-			star_marks[i].set_shape("star" if i < stars else "star_empty")
+		verdict.text = "%s  Works · done by time %d · score %d of %d%s" % [_stars_text(stars), int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
+
 		lost.text = note if note != "" else _where_it_went(state.regret())
 	else:
 		dot.color = Look.c("bad") if flagged >= 0 else Look.c("warn")
 		verdict.text = "🧭 Not yet: %s" % _friendly(result)
-		for star in star_marks:
-			star.visible = false
 		lost.text = note if note != "" else "Once the plan works, this shows where it falls short of the best there is. Stuck? Try Hint."
 
 # Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
@@ -501,7 +488,7 @@ func _show_step() -> void:
 	if step.is_empty():
 		var stars: int = state.stars()
 		choice_kicker.text = "ALL CHOSEN"
-		choice_prompt.text = "Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % stars
+		choice_prompt.text = "%s  Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % [_stars_text(stars), stars]
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
 		clue_label.text = ""
@@ -523,6 +510,10 @@ func _show_step() -> void:
 		option_buttons[k].text = _describe(step, k)
 	clue_label.text = "💡 " + state.clue()
 	selected = t
+
+# Earned stars as emoji, with an empty circle for each one not yet earned.
+func _stars_text(stars: int) -> String:
+	return "⭐".repeat(stars) + "⚪".repeat(3 - stars)
 
 # One word for how quickly a family member moves, and the role in the family's own terms.
 func _trait(c: int) -> String:
