@@ -47,7 +47,7 @@ jobs:
         run: ~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64 --headless --path . --import
       - name: Tests (each script exits non-zero on a failure)
         run: |
-          for t in conformance gameplay choices clues; do
+          for t in conformance gameplay choices clues flow; do
             echo "== $t"
             ~/godot/Godot_v${GODOT_RELEASE}_linux.x86_64 --headless --path . --script game/tests/$t.gd | grep -E "^(RESULT|FAIL|DISAGREE)"
             test ${PIPESTATUS[0]} -eq 0

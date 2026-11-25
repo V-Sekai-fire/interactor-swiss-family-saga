@@ -35,13 +35,17 @@ var map: Control
 var timeline: Control
 var premise: Label
 var verdict: Label
-var lost: Label
+var console: Label
+var console_lines: Array = []
+var next_button: Button
+var row_task: Array = []
 var choice_kicker: Label
 var choice_prompt: Label
 var rule: Label
 var clue_label: Label
 var option_buttons: Array = []
 var edit_card: Control
+var choice_card: Control
 var note := ""
 var dot: ColorRect
 var task_rows: Array = []        # per task: {"row", "button", "who"}
@@ -51,6 +55,7 @@ var start_label: Label
 var earliest_label: Label
 var perform_button: Button
 var island_edges: Array = []
+var hinted := -1
 var emoji_font: FontFile
 
 func _ready() -> void:
@@ -60,21 +65,32 @@ func _ready() -> void:
 	get_window().theme = theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	Look.sky(self)
+	# a window too small for the page scrolls it, never lets a card run past its box
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "top", "right", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, Look.PAGE)
-	add_child(margin)
+		margin.add_theme_constant_override("margin_" + side, 16)
+	scroll.add_child(margin)
 	var page := VBoxContainer.new()
 	page.add_theme_constant_override("separation", Look.GAP)
 	margin.add_child(page)
 
-	kicker = Look.kicker("")
-	page.add_child(kicker)
+	var top := HBoxContainer.new()
+	page.add_child(top)
 	var title := Label.new()
 	title.text = "The Swiss Family Saga"
 	Look.heading(title, Look.T.FONT_SIZE_PANEL_HEADING)
-	page.add_child(title)
+	top.add_child(title)
+	kicker = Look.kicker("")
+	kicker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	kicker.size_flags_vertical = Control.SIZE_SHRINK_END
+	top.add_child(kicker)
 
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", Look.GAP)
@@ -93,7 +109,7 @@ func _ready() -> void:
 	premise.custom_minimum_size = Vector2(500, 0)
 	island.add_child(premise)
 	map = IslandMap.new()
-	map.custom_minimum_size = Vector2(500, 190)
+	map.custom_minimum_size = Vector2(500, 168)
 	island.add_child(map)
 	var plan_box := Look.card(left, "The plan", "", 1)
 	timeline = Timeline.new()
@@ -101,11 +117,13 @@ func _ready() -> void:
 	timeline.state = state
 	timeline.names = FAMILY
 	plan_box.add_child(timeline)
-	lost = Label.new()
-	Look.muted(lost, 12)
-	Look.fixed(lost, 2, 500)
-	lost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	plan_box.add_child(lost)
+	console = Label.new()
+	Look.muted(console, 12)
+	console.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	console.custom_minimum_size = Vector2(500, 78)
+	console.clip_text = true
+	console.max_lines_visible = 4
+	plan_box.add_child(console)
 
 	# right: the tasks, and the one being planned
 	var right := VBoxContainer.new()
@@ -121,18 +139,19 @@ func _ready() -> void:
 		pick.toggle_mode = true
 		_style_row(pick)
 		pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		pick.clip_text = true
+		pick.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		pick.pressed.connect(_select.bind(t))
+		pick.pressed.connect(_select_row.bind(t))
 		row.add_child(pick)
 		var who := Label.new()
 		Look.muted(who, 12)
-		Look.fixed(who, 1, 190)
+		Look.fixed(who, 1, 150)
 		who.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(who)
 		task_rows.append({"row": row, "button": pick, "who": who})
 
 	var choice := Look.card(right, "Your choice", "", 1)
+	choice_card = choice.get_parent()
 	choice_kicker = Look.kicker("")
 	choice.add_child(choice_kicker)
 	choice_prompt = Label.new()
@@ -153,6 +172,7 @@ func _ready() -> void:
 		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_toggle(option)
+		option.toggle_mode = true
 		option.pressed.connect(_choose.bind(k))
 		choice.add_child(option)
 		option_buttons.append(option)
@@ -222,7 +242,7 @@ func _ready() -> void:
 	var aids := HBoxContainer.new()
 	aids.add_theme_constant_override("separation", 8)
 	editor.add_child(aids)
-	for entry in [["Hint", _hint], ["Tidy up", _tidy], ["Clear", _clear], ["Best plan", _best]]:
+	for entry in [["Tidy up", _tidy], ["Clear", _clear], ["Best plan", _best]]:
 		var aid := Button.new()
 		aid.text = entry[0]
 		aid.pressed.connect(entry[1])
@@ -240,11 +260,13 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Hint", _hint], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
 		bar.add_child(button)
+		if entry[0] == "Next":
+			next_button = button
 	_open_chapter()
 	_give_fallback_to_all(self)
 
@@ -307,6 +329,15 @@ func _open_chapter() -> void:
 		island_edges = _load("ch07_cape")["world"]["edges"]
 	state.begin_choices()
 	note = ""
+	row_task = []
+	for t in range(state.task_count()):
+		if bool(state.world["tasks"][t]["required"]):
+			row_task.append(t)
+	for t in range(state.task_count()):
+		if not bool(state.world["tasks"][t]["required"]):
+			row_task.append(t)
+	console_lines = []
+	_say("Chapter %d, %s: %d tasks, %d of them must be done." % [chapter + 1, CHAPTERS[chapter][1], state.task_count(), state.required_total()])
 	selected = 0
 	kicker.text = "CHAPTER %d OF %d · %s" % [chapter + 1, CHAPTERS.size(), str(CHAPTERS[chapter][1]).to_upper()]
 	premise.text = PREMISES[chapter]
@@ -316,9 +347,41 @@ func _open_chapter() -> void:
 	_show_step()
 	_refresh()
 
+# A chapter is done when every decision is made, or when a plan built by hand works.
+func _chapter_done() -> bool:
+	return state.choices_done() or (edit_card.visible and bool(state.verdict()["allowed"]))
+
 func _go(step: int) -> void:
+	if step > 0 and not _chapter_done():
+		_say("Finish this chapter before going on.")
+		_refresh()
+		return
 	chapter = posmod(chapter + step, CHAPTERS.size())
 	_open_chapter()
+
+func _select_row(r: int) -> void:
+	_select(row_task[r])
+
+# The console: what has happened, newest at the bottom, the last few lines.
+func _say(text: String) -> void:
+	if not console_lines.is_empty() and console_lines.back() == text:
+		return
+	console_lines.append(text)
+	while _console_rows() > 4 and console_lines.size() > 1:
+		console_lines.pop_front()
+	console.text = "\n".join(console_lines.map(func(l): return "› " + str(l)))
+
+# Rows the lines take when wrapped at about 50 characters (a little pessimistic).
+func _console_rows() -> int:
+	var rows := 0
+	for line in console_lines:
+		rows += int(ceil((str(line).length() + 2) / 50.0))
+	return rows
+
+func _flush_note() -> void:
+	if note != "":
+		_say(note)
+		note = ""
 
 func _select(t: int) -> void:
 	selected = t
@@ -335,6 +398,15 @@ func _soonest() -> void:
 	_refresh()
 
 func _hint() -> void:
+	# in a decision the hint points at the better answer; on the free board it places the next piece of the best plan
+	if not edit_card.visible and not state.choices_done():
+		var step: Dictionary = state.current_step()
+		var better := 0 if int(step["options"][0]["loss"]) == 0 else 1
+		note = "Hint: the %s answer is the better one." % ("top" if better == 0 else "bottom")
+		hinted = better
+		_refresh()
+		_ring_hint()
+		return
 	var h: Dictionary = state.hint()
 	if h.is_empty():
 		note = "That is already the best plan there is."
@@ -387,16 +459,17 @@ func _refresh() -> void:
 	# a task is flagged when a rule is broken, not when a must-do task simply has not been placed yet
 	if not result["allowed"] and int(result.get("task", -1)) >= 0 and str(result["reason"]) != "a required task is not done":
 		flagged = int(result["task"])
-	for t in range(state.task_count()):
+	for r in range(state.task_count()):
+		var t: int = row_task[r]
 		var task: Dictionary = state.world["tasks"][t]
-		var pick: Button = task_rows[t]["button"]
+		var pick: Button = task_rows[r]["button"]
 		pick.text = "%s  %s" % ["⬛" if task["kind"] == "duty" else "🔵", str(task.get("name", "")).split(":")[0]]
 		pick.set_pressed_no_signal(t == selected)
 		var names: Array = []
 		for c in state.members(t):
 			names.append(FAMILY[c])
-		task_rows[t]["who"].text = "%s · %d" % [", ".join(names), int(state.picks[t]["start"])] if state.is_done(t) else ("needed" if bool(task["required"]) else "optional")
-		task_rows[t]["who"].modulate = Color(1, 1, 1, 1.0 if state.is_done(t) else 0.6)
+		task_rows[r]["who"].text = "%s · %d" % [", ".join(names) if names.size() <= 2 else "%d people" % names.size(), int(state.picks[t]["start"])] if state.is_done(t) else ("needed" if bool(task["required"]) else "optional")
+		task_rows[r]["who"].modulate = Color(1, 1, 1, 1.0 if state.is_done(t) else 0.6)
 	var task: Dictionary = state.world["tasks"][selected]
 	detail.text = "%s at %s: %s. Takes %d. Worth %d points%s." % [str(task["kind"]).capitalize(), IslandMap.NAMES[int(task["at"]) - 1], _needs(task), int(task["quick"]), int(task["points"]), ", and a bonus of %d if performed" % int(task["bonus"]) if task["kind"] == "scout" and int(task["bonus"]) > 0 else ""]
 	for c in range(FAMILY.size()):
@@ -408,6 +481,7 @@ func _refresh() -> void:
 	perform_button.visible = task["kind"] == "scout"
 	perform_button.disabled = not assigned
 	perform_button.set_pressed_no_signal(bool(state.picks[selected]["performance"]))
+	next_button.disabled = not _chapter_done()
 	timeline.selected = selected
 	timeline.flagged = flagged
 	timeline.refresh()
@@ -418,11 +492,11 @@ func _refresh() -> void:
 		var stars: int = state.stars()
 		verdict.text = "%s  Works · done by time %d · score %d of %d%s" % [_stars_text(stars), int(result["end"]), int(result["score"]), best, "  ·  the best there is" if int(result["score"]) == best else ""]
 
-		lost.text = note if note != "" else _where_it_went(state.regret())
+		_flush_note()
 	else:
 		dot.color = Look.c("bad") if flagged >= 0 else Look.c("warn")
 		verdict.text = "🧭 Not yet: %s" % _friendly(result)
-		lost.text = note if note != "" else "Once the plan works, this shows where it falls short of the best there is. Stuck? Try Hint."
+		_flush_note()
 
 # Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
 func _where_it_went(r: Dictionary) -> String:
@@ -473,6 +547,7 @@ func _friendly(result: Dictionary) -> String:
 
 func _toggle_edit() -> void:
 	edit_card.visible = not edit_card.visible
+	choice_card.visible = not edit_card.visible
 	_refresh()
 
 func _restart() -> void:
@@ -492,6 +567,7 @@ func _show_step() -> void:
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
 		clue_label.text = ""
+		_say(_where_it_went(state.regret()))
 		return
 	var t: int = int(step["task"])
 	var task: Dictionary = state.world["tasks"][t]
@@ -506,6 +582,7 @@ func _show_step() -> void:
 			choice_prompt.text = "Is it worth doing: %s, at %s? It is not needed to finish the chapter." % [what, place]
 		_:
 			choice_prompt.text = "Who should %s, at %s? It needs %s." % [what, place, _needs(task)]
+	hinted = -1
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
 	clue_label.text = "💡 " + state.clue()
@@ -554,6 +631,10 @@ func _describe(step: Dictionary, k: int) -> String:
 	var line := "%s  ·  starts at %d, takes %d" % [" and ".join(who), int(option["start"]), int(option["takes"])]
 	return line + ("\n%s; %s" % [_trait(differing), state.need_phrase(differing).replace("has nothing else to do after this", "nothing else to do after this").replace("is needed again for", "needed again for")] if differing >= 0 else "")
 
+func _ring_hint() -> void:
+	for k in range(option_buttons.size()):
+		option_buttons[k].set_pressed_no_signal(k == hinted)
+
 func _choose(k: int) -> void:
 	if state.choices_done():
 		if k == 0:
@@ -563,5 +644,8 @@ func _choose(k: int) -> void:
 		return
 	var result: Dictionary = state.choose(k)
 	note = str(result["note"])
+	hinted = -1
+	for button in option_buttons:
+		button.set_pressed_no_signal(false)
 	_show_step()
 	_refresh()

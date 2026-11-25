@@ -10,7 +10,11 @@ of each chapter was proved optimal by a MiniZinc solver, and the game shows wher
   `conformance/`. Four deliberate breakages of the checker are each caught by these cases.
 - `game/tests/gameplay.gd`, `game/tests/choices.gd`, `game/tests/clues.gd`: the rules of play, the two-option decisions (the best answers reach the best plan; every wrong answer costs at least five points)
   and the clues.
-- Run any of them with `godot --headless --path . --script game/tests/NAME.gd`.
+- `game/tests/flow.gd`: Next stays locked until the chapter is done, the tasks are listed with the required ones first, and the console speaks.
+- `game/tests/layout.gd` and `tools/layout_check.lean`: the layout of every control in every state a player can reach (each chapter at each decision, the end screen and the free board) is dumped as JSON,
+  and the Lean program checks that nothing leaves the window or its box, no text is cut off or hidden, and no two controls in one container overlap. Run
+  `godot --headless --path . --script game/tests/layout.gd -- layout.json` and then `lean --run tools/layout_check.lean layout.json`.
+- Run any of the Godot tests with `godot --headless --path . --script game/tests/NAME.gd`.
 
 ## Making the levels
 
