@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 # The game on GitHub Pages: the tests run on the official Godot engine, the game is exported for the web with the official single-thread template (so the page needs no special headers),
-# and a push to main publishes it at https://v-sekai-fire.github.io/interactor-swiss-family-saga/. A pull request builds and tests but does not publish.
+# and a push to main publishes it at https://v-sekai-fire.github.io/interactor-swiss-family-saga/. A pull request or a merge-queue run builds and tests but does not publish.
 name: pages
 on:
+  merge_group:
   pull_request:
   push:
     branches: [main]
@@ -65,7 +66,7 @@ jobs:
           path: build/web
   deploy:
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       pages: write
