@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-# The plan as a timeline: one row per family member, one bar per task they are on, laid out in time. Duties are inked, scouting is the accent colour, the selected task
-# has a ring, and the task the checker refuses is outlined in the design system's "bad" colour.
+# docs/code.md
 extends Control
 
 const Look = preload("res://look/look.gd")
