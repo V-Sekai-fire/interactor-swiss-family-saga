@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-# Plays every chapter as a run of two-option decisions: always the best option reaches the best plan; always the other option still gives a plan that works and scores
-# less; every step offers exactly two options. Run: godot --headless --path . --script game/tests/choices.gd
+# docs/code.md
 extends SceneTree
 
 const State := preload("res://game/scripts/game_state.gd")
@@ -16,7 +15,6 @@ func _check(name: String, ok: bool) -> void:
 func _init() -> void:
 	for chapter in ["ch01_landing", "ch02_falconhurst", "ch03_boat", "ch04_rockburg", "ch05_stairs", "ch06_farms", "ch07_cape", "ch08_ship"]:
 		var data = JSON.parse_string(FileAccess.get_file_as_string("res://conformance/%s.json" % chapter))
-		# the emoji after each name is the screen's own table; it must say what the chapter's roles say
 		var roles: Array = data["world"]["chars"].map(func(ch): return str(ch["role"]))
 		_check("%s: the screen's roles are the chapter's" % chapter, roles == Main.FAMILY_ROLE)
 		for policy in ["best", "other", "first"]:

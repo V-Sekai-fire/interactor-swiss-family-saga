@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 K. S. Ernest (iFire) Lee
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-# The game screen, in the Chibifire design system: the chapter and its island, the tasks it asks for, the family, and the plan the player builds. Any plan may be
-# built; the checker judges it as it changes, and the score is set against the model's best.
+# docs/code.md
 extends Control
 
 const Look = preload("res://look/look.gd")
@@ -14,8 +13,6 @@ const CHAPTERS := [
 	["ch05_stairs", "Stairs and the bridge"], ["ch06_farms", "Farms and the pinnace"], ["ch07_cape", "Cape Minster"], ["ch08_ship", "The ship"],
 ]
 const FAMILY := ["Father", "Mother", "Fritz", "Ernest", "Jack", "Francis"]
-# Each role has one emoji, shown after the name and in what a task needs, so matching people to a task is reading, not remembering. Per role, not per person:
-# a task asks for "a damage", and Ernest or Jack fills it. The roles are levels/family.exs's; game/tests/choices.gd checks every chapter agrees.
 const ROLE_EMOJI := {"tank": "💪", "healer": "🩹", "damage": "🎯", "support": "🤝"}
 const FAMILY_ROLE := ["support", "healer", "tank", "damage", "damage", "support"]
 const PREMISES := [
@@ -28,7 +25,6 @@ const PREMISES := [
 	"With the pinnace the far shore is in reach. Scout the cape and light a signal fire ships can see.",
 	"Years have passed and a sail is on the horizon. Light the fire, bring the journal, receive the captain.",
 ]
-# The design system's four state colours, one per role.
 const ROLE_COLOURS := {"tank": "bad", "healer": "good", "damage": "warn", "support": "note"}
 
 var chapter := 0
@@ -89,7 +85,6 @@ func _ready() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page.add_child(body)
 
-	# left: the island, and the plan as a timeline
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override("separation", Look.GAP)
 	left.custom_minimum_size = Vector2(540, 0)
@@ -117,7 +112,6 @@ func _ready() -> void:
 	console.max_lines_visible = 4
 	plan_box.add_child(console)
 
-	# right: the tasks, and the one being planned
 	var right := VBoxContainer.new()
 	right.add_theme_constant_override("separation", Look.GAP)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -267,7 +261,6 @@ func _ready() -> void:
 			solve_button = button
 	_open_chapter()
 
-# A toggle that shows its state: outlined when off, inked when on (the design system's colours).
 func _style_toggle(b: Button) -> void:
 	b.add_theme_stylebox_override("normal", Look.box(Look.c("card"), 8, Look.c("line"), 8))
 	b.add_theme_stylebox_override("hover", Look.box(Look.c("paper-2"), 8, Look.c("ink"), 8))
@@ -280,7 +273,6 @@ func _style_toggle(b: Button) -> void:
 	b.add_theme_color_override("font_hover_pressed_color", Look.c("paper"))
 	b.add_theme_color_override("font_disabled_color", Color(Look.c("mute"), 0.6))
 
-# A row of the task list: bare when it is not the one being planned, ringed when it is.
 func _style_row(b: Button) -> void:
 	var bare := Look.box(Color(0, 0, 0, 0), 8, Color(0, 0, 0, 0), 2)
 	b.add_theme_stylebox_override("normal", bare)
@@ -336,7 +328,6 @@ func _go(step: int) -> void:
 func _select_row(r: int) -> void:
 	_select(row_task[r])
 
-# The console: what has happened, newest at the bottom, the last few lines.
 func _say(text: String) -> void:
 	if not console_lines.is_empty() and console_lines.back() == text:
 		return
@@ -345,7 +336,6 @@ func _say(text: String) -> void:
 		console_lines.pop_front()
 	console.text = "\n".join(console_lines.map(func(l): return "› " + str(l)))
 
-# Rows the lines take when wrapped at about 50 characters (a little pessimistic).
 func _console_rows() -> int:
 	var rows := 0
 	for line in console_lines:
@@ -497,8 +487,6 @@ func _refresh() -> void:
 		verdict.text = "🧭 Not yet: %s" % _friendly(result)
 		_flush_note()
 
-# The score worked out where the player sees it at the end: what the tasks earn, what the days cost, the best plan's own sum, what the next star needs, and where the
-# points went.
 func _score_story(stars: int) -> String:
 	var r: Dictionary = state.regret()
 	if r.is_empty():
@@ -565,7 +553,6 @@ func _friendly(result: Dictionary) -> String:
 			return "%s is out of its time window." % name
 	return str(result["reason"])
 
-# ---- two choices at a time ----
 
 func _toggle_edit() -> void:
 	edit_card.visible = not edit_card.visible
@@ -621,12 +608,9 @@ func _show_step() -> void:
 	_ring_hint()
 	selected = t
 
-# Earned stars as emoji, with an empty circle for each one not yet earned.
 func _stars_text(stars: int) -> String:
 	return "⭐".repeat(stars) + "⚪".repeat(3 - stars)
 
-# One word for how quickly a family member moves, and the role in the family's own terms.
-# A family member as shown: the name and the role's emoji.
 func _who(c: int) -> String:
 	return "%s %s" % [FAMILY[c], ROLE_EMOJI[FAMILY_ROLE[c]]]
 
@@ -660,7 +644,6 @@ func _describe(step: Dictionary, k: int) -> String:
 	for c in range(FAMILY.size()):
 		if (int(option["party"]) >> c) & 1 == 1:
 			who.append(_who(c))
-	# the member who differs between the two answers is the one to read about
 	var differing := -1
 	for c in range(FAMILY.size()):
 		if ((int(option["party"]) >> c) & 1) == 1 and ((int(other["party"]) >> c) & 1) == 0:
