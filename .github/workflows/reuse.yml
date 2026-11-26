@@ -3,6 +3,7 @@
 # Every file carries its copyright and licence (the REUSE specification).
 name: reuse
 on:
+  merge_group:
   pull_request:
   push:
     branches: [main]
