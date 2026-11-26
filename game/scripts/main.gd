@@ -14,6 +14,10 @@ const CHAPTERS := [
 	["ch05_stairs", "Stairs and the bridge"], ["ch06_farms", "Farms and the pinnace"], ["ch07_cape", "Cape Minster"], ["ch08_ship", "The ship"],
 ]
 const FAMILY := ["Father", "Mother", "Fritz", "Ernest", "Jack", "Francis"]
+# Each role has one emoji, shown after the name and in what a task needs, so matching people to a task is reading, not remembering. Per role, not per person:
+# a task asks for "a damage", and Ernest or Jack fills it. The roles are levels/family.exs's; game/tests/choices.gd checks every chapter agrees.
+const ROLE_EMOJI := {"tank": "💪", "healer": "🩹", "damage": "🎯", "support": "🤝"}
+const FAMILY_ROLE := ["support", "healer", "tank", "damage", "damage", "support"]
 const PREMISES := [
 	"The wreck lies off Safety Bay. Bring the stores ashore, set up the first camp and find fresh water before night.",
 	"The great tree at the river is the safe house. Fell the timber, raise a platform, bridge the river.",
@@ -103,7 +107,7 @@ func _ready() -> void:
 	timeline = Timeline.new()
 	timeline.custom_minimum_size = Vector2(500, 6 * 22 + 20)
 	timeline.state = state
-	timeline.names = FAMILY
+	timeline.names = range(FAMILY.size()).map(func(c): return _who(c))
 	plan_box.add_child(timeline)
 	console = Label.new()
 	Look.muted(console, 12)
@@ -185,7 +189,7 @@ func _ready() -> void:
 	for c in range(FAMILY.size()):
 		var member := Button.new()
 		member.toggle_mode = true
-		member.text = FAMILY[c]
+		member.text = _who(c)
 		member.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_style_toggle(member)
 		member.pressed.connect(_member.bind(c))
@@ -409,7 +413,7 @@ func _solve() -> void:
 		var who: Array = []
 		for c in range(FAMILY.size()):
 			if (int(h["party"]) >> c) & 1 == 1:
-				who.append(FAMILY[c])
+				who.append(_who(c))
 		note = "Solve: %s %s “%s”, from time %d%s." % [" and ".join(who), "do" if who.size() > 1 else "does", str(state.world["tasks"][selected].get("name", "")).split(":")[0], int(h["start"]), ", performing it" if bool(h["performance"]) else ""]
 	_refresh()
 
@@ -444,7 +448,7 @@ func _needs(task: Dictionary) -> String:
 	var parts: Array = []
 	for r in range(4):
 		if int(task["roles"][r]) > 0:
-			parts.append("%d %s" % [int(task["roles"][r]), roles[r]])
+			parts.append("%s %s" % [ROLE_EMOJI[roles[r]].repeat(int(task["roles"][r])), roles[r]])
 	return ", ".join(parts)
 
 func _refresh() -> void:
@@ -461,7 +465,7 @@ func _refresh() -> void:
 		pick.set_pressed_no_signal(t == selected)
 		var names: Array = []
 		for c in state.members(t):
-			names.append(FAMILY[c])
+			names.append(_who(c))
 		task_rows[r]["who"].text = "%s · %d" % [", ".join(names) if names.size() <= 2 else "%d people" % names.size(), int(state.picks[t]["start"])] if state.is_done(t) else ("needed" if bool(task["required"]) else "optional")
 		task_rows[r]["who"].modulate = Color(1, 1, 1, 1.0 if state.is_done(t) else 0.6)
 	var task: Dictionary = state.world["tasks"][selected]
@@ -622,10 +626,14 @@ func _stars_text(stars: int) -> String:
 	return "⭐".repeat(stars) + "⚪".repeat(3 - stars)
 
 # One word for how quickly a family member moves, and the role in the family's own terms.
+# A family member as shown: the name and the role's emoji.
+func _who(c: int) -> String:
+	return "%s %s" % [FAMILY[c], ROLE_EMOJI[FAMILY_ROLE[c]]]
+
 func _trait(c: int) -> String:
 	var info: Dictionary = state.world["chars"][c]
 	var speed := "quick on foot" if int(info["stride"]) >= 115 else ("steady on foot" if int(info["stride"]) >= 100 else "slower on foot")
-	return "%s: %s, %s%s" % [FAMILY[c], str(info["role"]), speed, ", can perform" if bool(info["perform"]) else ""]
+	return "%s: %s, %s%s" % [_who(c), str(info["role"]), speed, ", can perform" if bool(info["perform"]) else ""]
 
 # What a task adds to the score: its points count double, and a bonus counts as it is for a duty or a task done properly.
 func _worth(task: Dictionary, performed: bool) -> int:
@@ -651,7 +659,7 @@ func _describe(step: Dictionary, k: int) -> String:
 	var who: Array = []
 	for c in range(FAMILY.size()):
 		if (int(option["party"]) >> c) & 1 == 1:
-			who.append(FAMILY[c])
+			who.append(_who(c))
 	# the member who differs between the two answers is the one to read about
 	var differing := -1
 	for c in range(FAMILY.size()):
