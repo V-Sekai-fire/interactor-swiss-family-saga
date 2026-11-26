@@ -6,7 +6,7 @@ extends Control
 
 const Look = preload("res://look/look.gd")
 const ROW := 22.0
-const LEFT := 64.0
+const LEFT := 88.0 # room for the longest name and its role emoji ("Francis 🤝")
 
 var state: RefCounted
 var names: Array = []
