@@ -24,6 +24,12 @@ Each role has one emoji: 💪 tank, 🩹 healer, 🎯 damage, 🤝 support. It i
 
 When every decision is made, the screen works the score out: what the tasks earn, minus the days the plan takes. When the best plan scores more, its own sum is shown too. Then come the score the next star needs and where the points went. The next-star score uses the same ratio test as `stars()`, so float rounding cannot ask for one point too many.
 
+### Dark mode
+
+The design system has two schemes: "paper-and-ink" (light) and "observatory" (dark: night, brass and chalk). The first start follows the system setting (`DisplayServer.is_dark_mode()`, which is `prefers-color-scheme` in a browser). The Dark or Light button switches the scheme and reloads the screen, because the design system sets colours when the screen is built. The chapter is kept across the reload, but the answers already given in it start over. The choice is kept in static variables, so it lasts until the page is closed. In the dark scheme the duty mark in the task list is ⬜, because ⬛ cannot be seen on the night background.
+
+The task list shows plain names, without role emoji, because "Father 🤝, Fritz 💪" does not fit its column.
+
 ## The timeline (`game/scripts/timeline.gd`)
 
 One row per family member and one bar per task they are on, laid out in time. Duties are inked and scouting is the accent colour. The selected task has a ring, and the task the checker refuses is outlined in the design system's "bad" colour.

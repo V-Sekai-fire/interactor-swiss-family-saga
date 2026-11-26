@@ -28,6 +28,9 @@ const PREMISES := [
 const ROLE_COLOURS := {"tank": "bad", "healer": "good", "damage": "warn", "support": "note"}
 
 var chapter := 0
+# docs/code.md, "Dark mode"
+static var scheme_chosen := false
+static var resume_chapter := 0
 var state: RefCounted = State.new()
 var selected := 0
 var kicker: Label
@@ -64,6 +67,10 @@ var solve_button: Button
 var clue_text := ""
 
 func _ready() -> void:
+	if not scheme_chosen:
+		Look.scheme(DisplayServer.is_dark_mode_supported() and DisplayServer.is_dark_mode())
+		scheme_chosen = true
+	chapter = resume_chapter
 	Look.fit(get_window())
 	var theme: Theme = Look.make()
 	get_window().theme = theme
@@ -244,7 +251,7 @@ func _ready() -> void:
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	verdict.clip_text = true
 	bar.add_child(verdict)
-	for entry in [["Hint", _hint], ["Solve", _solve], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
+	for entry in [["Light" if Look.observatory else "Dark", _toggle_scheme], ["Hint", _hint], ["Solve", _solve], ["Edit by hand", _toggle_edit], ["Restart", _restart], ["Previous", _go.bind(-1)], ["Next", _go.bind(1)]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -260,6 +267,11 @@ func _ready() -> void:
 			_style_toggle(button)
 			solve_button = button
 	_open_chapter()
+
+func _toggle_scheme() -> void:
+	Look.scheme(not Look.observatory)
+	resume_chapter = chapter
+	get_tree().reload_current_scene()
 
 func _style_toggle(b: Button) -> void:
 	b.add_theme_stylebox_override("normal", Look.box(Look.c("card"), 8, Look.c("line"), 8))
@@ -451,11 +463,11 @@ func _refresh() -> void:
 		var t: int = row_task[r]
 		var task: Dictionary = state.world["tasks"][t]
 		var pick: Button = task_rows[r]["button"]
-		pick.text = "%s  %s" % ["⬛" if task["kind"] == "duty" else "🔵", str(task.get("name", "")).split(":")[0]]
+		pick.text = "%s  %s" % [("⬜" if Look.observatory else "⬛") if task["kind"] == "duty" else "🔵", str(task.get("name", "")).split(":")[0]]
 		pick.set_pressed_no_signal(t == selected)
 		var names: Array = []
 		for c in state.members(t):
-			names.append(_who(c))
+			names.append(FAMILY[c])
 		task_rows[r]["who"].text = "%s · %d" % [", ".join(names) if names.size() <= 2 else "%d people" % names.size(), int(state.picks[t]["start"])] if state.is_done(t) else ("needed" if bool(task["required"]) else "optional")
 		task_rows[r]["who"].modulate = Color(1, 1, 1, 1.0 if state.is_done(t) else 0.6)
 	var task: Dictionary = state.world["tasks"][selected]
