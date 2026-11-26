@@ -493,6 +493,29 @@ func _refresh() -> void:
 		verdict.text = "🧭 Not yet: %s" % _friendly(result)
 		_flush_note()
 
+# The score worked out where the player sees it at the end: what the tasks earn, what the days cost, the best plan's own sum, what the next star needs, and where the
+# points went.
+func _score_story(stars: int) -> String:
+	var r: Dictionary = state.regret()
+	if r.is_empty():
+		return ""
+	var tw := int(state.world["time_weight"])
+	var score := int(state.verdict()["score"])
+	var best: int = state.best_score()
+	var end := int(r["end"])
+	var best_end := int(r["best_end"])
+	var lines: Array = ["Score %d: the tasks earn %d, minus %d for the %d days it takes." % [score, score + tw * end, tw * end, end]]
+	if score < best:
+		lines[0] += " The best plan earns %d in %d days: %d." % [best + tw * best_end, best_end, best]
+	if stars < 3 and best > 0:
+		var share := 1.0 if stars == 2 else (0.7 if stars == 1 else 0.4)
+		var need := int(floor(share * best))
+		while float(need) / float(best) < share: # the same test stars() makes, so float rounding cannot ask for one point too many
+			need += 1
+		lines.append("%s %d." % ["Three stars need" if stars == 2 else ("Two stars need" if stars == 1 else "One star needs"), need])
+	lines.append(_where_it_went(r))
+	return "\n".join(lines)
+
 # Where the points went, from the model's own best plan: the extra time, then the tasks that earned less, the largest first.
 func _where_it_went(r: Dictionary) -> String:
 	if r.is_empty() or int(r["gap"]) == 0:
@@ -563,12 +586,11 @@ func _show_step() -> void:
 	if step.is_empty():
 		var stars: int = state.stars()
 		choice_kicker.text = "ALL CHOSEN"
-		choice_prompt.text = "%s  Every decision is made: %d of 3 stars. Try again to see how the other choices play out, or go on." % [_stars_text(stars), stars]
+		choice_prompt.text = "%s  Every decision is made: %d of 3 stars.\n%s" % [_stars_text(stars), stars, _score_story(stars)]
 		option_buttons[0].text = "Try again"
 		option_buttons[1].text = "Next chapter"
 		clue_text = ""
 		clue_label.visible = false
-		_say(_where_it_went(state.regret()))
 		return
 	var t: int = int(step["task"])
 	var task: Dictionary = state.world["tasks"][t]
