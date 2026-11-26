@@ -574,15 +574,16 @@ func _show_step() -> void:
 	var task: Dictionary = state.world["tasks"][t]
 	var what := str(task.get("name", "")).split(":")[0]
 	var place: String = IslandMap.NAMES[int(task["at"]) - 1]
+	var at_place := "" if what.contains(place) else ", at %s" % place # "raise the tent at Tentholm" names its place already
 	rule.text = "Score = what the tasks add, minus the time taken. Best: %d." % state.best_score()
 	choice_kicker.text = "CHOICE %d OF %d" % [int(step["index"]) + 1, int(step["total"])]
 	match str(step["kind"]):
 		"perform":
-			choice_prompt.text = "%s, at %s. Do it properly for a bonus, or just take a quick look?" % [what.substr(0, 1).to_upper() + what.substr(1), place]
+			choice_prompt.text = "%s%s. Do it properly for a bonus, or just take a quick look?" % [what.substr(0, 1).to_upper() + what.substr(1), at_place]
 		"skip":
-			choice_prompt.text = "Is it worth doing: %s, at %s? It is not needed to finish the chapter." % [what, place]
+			choice_prompt.text = "Is it worth doing: %s%s? It is not needed to finish the chapter." % [what, at_place]
 		_:
-			choice_prompt.text = "Who should %s, at %s? It needs %s." % [what, place, _needs(task)]
+			choice_prompt.text = "Who should %s%s? It needs %s." % [what, at_place, _needs(task)]
 	hinted = -1
 	for k in range(2):
 		option_buttons[k].text = _describe(step, k)
